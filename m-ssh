@@ -1,4 +1,5 @@
 #!/bin/bash
+
 G="\e[92m"; O="\e[93m"; C="\e[36m"; B="\e[36m"; P="\e[35m"; PINK="\e[95m"; BG_RED="\e[41m"; BG_BLUE="\e[44m"; R="\e[91m"; NC="\e[0m"
 DB_FILE="/etc/vpn/database.db"
 DOMAIN=$(cat /etc/vpn/domain.txt 2>/dev/null)
@@ -771,7 +772,8 @@ recovery_ssh() {
                 userdel -f "$u" 2>/dev/null
                 echo -e "${G}Deleted $u${NC}"
             done
-            echo -e "\n${G}Successfully Deleted All Recovery Users${NC}\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy; continue 
+            echo -e "\n${G}Successfully Deleted All Recovery Users${NC}\n\n${PINK}Press Enter for Back to Manage${NC}"
+            read dummy; continue 
         fi
 
         target_user=""
@@ -849,10 +851,8 @@ while true; do
         11) recovery_ssh ;;
         12) edit_limit_ip_ssh ;;
         13) edit_limit_ip_all_ssh ;;
-        14) break ;;
-        x|X) clear; exit 0 ;;
+        14) exit 0 ;;
+        x|X) exit 0 ;;
         *) echo -e "\n ${R}Please enter an correct number${NC}"; sleep 1 ;;
     esac
 done
-EOF
-chmod +x /usr/bin/m-ssh
