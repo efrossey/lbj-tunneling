@@ -23,7 +23,7 @@ echo -e "\n${G}Domain berhasil disimpan: ${domain_input}${NC}\n"
 echo -e "Memulai download modul skrip LBJ Tunneling..."
 
 # URL RAW dari GitHub Anda (JANGAN LUPA DIGANTI)
-REPO_URL="https://raw.githubusercontent.com/USERNAME-GITHUB-ANDA/NAMA-REPO-ANDA/main"
+REPO_URL="https://raw.githubusercontent.com/efrossey/lbj-tunneling/refs/heads/main"
 
 # Proses Download & Pemasangan Izin Eksekusi
 cd /usr/bin
