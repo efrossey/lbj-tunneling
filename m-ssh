@@ -1,4 +1,3 @@
-cat > /usr/bin/m-ssh << 'EOF'
 #!/bin/bash
 G="\e[92m"; O="\e[93m"; C="\e[36m"; B="\e[36m"; P="\e[35m"; PINK="\e[95m"; BG_RED="\e[41m"; BG_BLUE="\e[44m"; R="\e[91m"; NC="\e[0m"
 DB_FILE="/etc/vpn/database.db"
@@ -11,15 +10,8 @@ create_ssh() {
         echo -e "${B}-----------------------------------------------${NC}"
         echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
         echo -e "${B}-----------------------------------------------${NC}"
-        echo -e ""
-        echo -e "${G}Just input a number for Limit IP${NC}"
-        echo -e ""
-        echo -e "${G}0 for No Limit${NC}"
-        echo -e ""
-        echo -e "${R}Press CTRL+C for CANCEL${NC}"
-        echo -e "${B}-----------------------------------------------${NC}"
-        echo -e ""
-        
+        echo -e "\n${G}Just input a number for Limit IP\n\n0 for No Limit\n\n${R}Press CTRL+C for CANCEL${NC}\n"
+        echo -e "${B}-----------------------------------------------${NC}\n"
         echo -ne "${G}Username      : ${NC}"; read user
         if [[ -z "$user" ]]; then continue; fi
         
@@ -48,8 +40,7 @@ create_ssh() {
     clear
     echo -e "${B}-----------------------------------------------${NC}"
     echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
-    echo -e "${B}-----------------------------------------------${NC}"
-    echo -e ""
+    echo -e "${B}-----------------------------------------------${NC}\n"
     echo -e "${PINK}                 SSH/Dropbear                  ${NC}"
     echo -e "${B}-----------------------------------------------${NC}"
     echo -e "${G}HOST              : $DOMAIN${NC}"
@@ -58,21 +49,7 @@ create_ssh() {
     echo -e "${G}Quota             : ${quota}GB${NC}"
     echo -e "${G}Limit IP          : $iplimit${NC}"
     echo -e "${B}-----------------------------------------------${NC}"
-    echo -e "${G}TLS               : 443,8443${NC}"
-    echo -e "${G}None TLS          : 80,8080${NC}"
-    echo -e "${G}Any               : 2082,2083,8880${NC}"
-    echo -e "${G}OpenSSH           : 444${NC}"
-    echo -e "${G}Dropbear          : 90,109,143${NC}"
-    echo -e "${G}SlowDNS           : 53,5300${NC}"
-    echo -e "${G}UDP-Custom        : 1-65535${NC}"
-    echo -e "${G}OHP + SSH         : 9080${NC}"
-    echo -e "${G}Squid Proxy       : 3128${NC}"
-    echo -e "${G}BadVPN UDPGW      : 7100-7600${NC}"
-    echo -e "${G}OpenVPN TCP       : 80,1194${NC}"
-    echo -e "${G}OpenVPN SSL       : 443${NC}"
-    echo -e "${G}OpenVPN UDP       : 25000${NC}"
-    echo -e "${G}OpenVPN DNS       : 53${NC}"
-    echo -e "${G}OHP + OVPN        : 9088${NC}"
+    echo -e "${G}TLS               : 443,8443\nNone TLS          : 80,8080\nAny               : 2082,2083,8880\nOpenSSH           : 444\nDropbear          : 90,109,143\nSlowDNS           : 53,5300\nUDP-Custom        : 1-65535\nOHP + SSH         : 9080\nSquid Proxy       : 3128\nBadVPN UDPGW      : 7100-7600\nOpenVPN TCP       : 80,1194\nOpenVPN SSL       : 443\nOpenVPN UDP       : 25000\nOpenVPN DNS       : 53\nOHP + OVPN        : 9088${NC}"
     echo -e "${B}-----------------------------------------------${NC}"
     echo -e "${PINK}                    OpenVPN                    ${NC}"
     echo -e "${B}-----------------------------------------------${NC}"
@@ -89,16 +66,8 @@ trial_ssh() {
     echo -e "${B}-----------------------------------------------${NC}"
     echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
     echo -e "${B}-----------------------------------------------${NC}"
-    echo -e ""
-    echo -e "${G}Time Format :${NC}"
-    echo -e ""
-    echo -e "${G}  h - H (Hours)\n  m - M (Minutes)${NC}"
-    echo -e ""
-    echo -e "${G}Example : ${O}1h${NC} ${G}for 1 hours${NC}"
-    echo -e ""
-    echo -e "${R}Press CTRL+C for CANCEL${NC}"
-    echo -e "${B}-----------------------------------------------${NC}"
-    echo -e ""
+    echo -e "\n${G}Time Format :\n\n  h - H (Hours)\n  m - M (Minutes)\n\nExample : ${O}1h${NC} ${G}for 1 hours${NC}\n\n${R}Press CTRL+C for CANCEL${NC}"
+    echo -e "${B}-----------------------------------------------${NC}\n"
     
     while true; do
         echo -ne "${G}Trial Time       : ${NC}"; read trial_time
@@ -113,7 +82,6 @@ trial_ssh() {
 
     user="trial-$(tr -dc 'a-z0-9' < /dev/urandom | head -c 8)"
     pass=$(tr -dc 'a-z0-9' < /dev/urandom | head -c 8)
-    
     useradd -e $exp_sys -s /bin/false -M $user 2>/dev/null
     echo -e "$user:$pass" | chpasswd
     sqlite3 "$DB_FILE" "INSERT INTO users (username, protocol, exp_date, ip_limit, password) VALUES ('$user', 'ssh', '$exp_db', '1', '$pass');"
@@ -121,37 +89,19 @@ trial_ssh() {
     clear
     echo -e "${B}-----------------------------------------------${NC}"
     echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
-    echo -e "${B}-----------------------------------------------${NC}"
-    echo -e ""
+    echo -e "${B}-----------------------------------------------${NC}\n"
     echo -e "${PINK}                 SSH/Dropbear                  ${NC}"
     echo -e "${B}-----------------------------------------------${NC}"
-    echo -e "${G}HOST              : $DOMAIN${NC}"
-    echo -e "${G}Username          : $user${NC}"
-    echo -e "${G}Password          : $pass${NC}"
+    echo -e "${G}HOST              : $DOMAIN\nUsername          : $user\nPassword          : $pass${NC}"
     echo -e "${B}-----------------------------------------------${NC}"
-    echo -e "${G}TLS               : 443,8443${NC}"
-    echo -e "${G}None TLS          : 80,8080${NC}"
-    echo -e "${G}Any               : 2082,2083,8880${NC}"
-    echo -e "${G}OpenSSH           : 444${NC}"
-    echo -e "${G}Dropbear          : 90,109,143${NC}"
-    echo -e "${G}SlowDNS           : 53,5300${NC}"
-    echo -e "${G}UDP-Custom        : 1-65535${NC}"
-    echo -e "${G}OHP + SSH         : 9080${NC}"
-    echo -e "${G}Squid Proxy       : 3128${NC}"
-    echo -e "${G}BadVPN UDPGW      : 7100-7600${NC}"
-    echo -e "${G}OpenVPN TCP       : 80,1194${NC}"
-    echo -e "${G}OpenVPN SSL       : 443${NC}"
-    echo -e "${G}OpenVPN UDP       : 25000${NC}"
-    echo -e "${G}OpenVPN DNS       : 53${NC}"
-    echo -e "${G}OHP + OVPN        : 9088${NC}"
+    echo -e "${G}TLS               : 443,8443\nNone TLS          : 80,8080\nAny               : 2082,2083,8880\nOpenSSH           : 444\nDropbear          : 90,109,143\nSlowDNS           : 53,5300\nUDP-Custom        : 1-65535\nOHP + SSH         : 9080\nSquid Proxy       : 3128\nBadVPN UDPGW      : 7100-7600\nOpenVPN TCP       : 80,1194\nOpenVPN SSL       : 443\nOpenVPN UDP       : 25000\nOpenVPN DNS       : 53\nOHP + OVPN        : 9088${NC}"
     echo -e "${B}-----------------------------------------------${NC}"
     echo -e "${PINK}                    OpenVPN                    ${NC}"
     echo -e "${B}-----------------------------------------------${NC}"
     echo -e "${G}http://$DOMAIN:81/myvpn-config.zip${NC}"
     echo -e "${B}-----------------------------------------------${NC}"
     echo -e "${O}         Expired  :  $exp_display${NC}"
-    echo -e "${B}-----------------------------------------------${NC}\n"
-    echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy
+    echo -e "${B}-----------------------------------------------${NC}\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
 }
 
 delete_ssh() {
@@ -160,11 +110,9 @@ delete_ssh() {
         clear
         echo -e "${B}-----------------------------------------------${NC}"
         echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
-        echo -e "${B}-----------------------------------------------${NC}"
-        echo -e ""
+        echo -e "${B}-----------------------------------------------${NC}\n"
         echo -e "             ${PINK}SSH-Dropbear-OpenVPN              ${NC}"
-        echo -e "${B}-----------------------------------------------${NC}"
-        echo -e ""
+        echo -e "${B}-----------------------------------------------${NC}\n"
         echo -e "${B}===============================================${NC}"
         printf "${O}  %-14s %-15s %s${NC}\n" "USERNAME" "EXP DATE" "STATUS"
         echo -e "${B}===============================================${NC}"
@@ -172,8 +120,7 @@ delete_ssh() {
         mapfile -t ssh_users < <(sqlite3 "$DB_FILE" "SELECT username, exp_date, status FROM users WHERE protocol='ssh';")
         total_acc=${#ssh_users[@]}
 
-        declare -A user_map
-        declare -A exp_map
+        declare -A user_map; declare -A exp_map
         if [ "$total_acc" -eq 0 ]; then echo -e "${G}              No User Found                    ${NC}"
         else
             i=1
@@ -187,18 +134,16 @@ delete_ssh() {
                 status_show="UNLOCKED"
                 if [ "$status_db" == "locked" ]; then status_show="LOCKED"; fi
                 printf "${G}%2d) %-14s %-15s %s${NC}\n" "$i" "${username:0:14}" "$formatted_date" "$status_show"
-                user_map[$i]="$username"
-                exp_map[$username]="$exp_date"
+                user_map[$i]="$username"; exp_map[$username]="$exp_date"
                 ((i++))
             done
         fi
         echo -e "${B}===============================================${NC}"
         if [ "$total_acc" -le 1 ]; then echo -e "${O} Total Account: $total_acc user${NC}"; else echo -e "${O} Total Account: $total_acc users${NC}"; fi
-        echo -e "${B}===============================================${NC}"
-        echo -e "\n${G}Press CTRL+C for CANCEL${NC}\n"
+        echo -e "${B}===============================================${NC}\n"
+        echo -e "${G}Press CTRL+C for CANCEL${NC}\n"
         
         if [ "$total_acc" -eq 0 ]; then echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy; return; fi
-
         if [ "$total_acc" -eq 1 ]; then prompt_range="[1]"; else prompt_range="[1-$total_acc]"; fi
         echo -ne "${G}Select client $prompt_range or [user]: ${NC}"; read client_opt
 
@@ -208,9 +153,7 @@ delete_ssh() {
             target_user="${user_map[$client_opt]}"; del_exp="${exp_map[$target_user]}"; valid_user=1
         else
             for i in "${!user_map[@]}"; do
-                if [ "${user_map[$i]}" == "$client_opt" ]; then
-                    target_user="$client_opt"; del_exp="${exp_map[$target_user]}"; valid_user=1; break
-                fi
+                if [ "${user_map[$i]}" == "$client_opt" ]; then target_user="$client_opt"; del_exp="${exp_map[$target_user]}"; valid_user=1; break; fi
             done
         fi
         if [ "$valid_user" -eq 0 ]; then echo -e "\n${R}User Not Found\nTry again in 2 second${NC}\n"; sleep 2; continue; else break; fi
@@ -229,15 +172,12 @@ delete_ssh() {
         clear
         echo -e "${B}-----------------------------------------------${NC}"
         echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}\n"
         echo -e "${B}-----------------------------------------------${NC}"
-        echo -e ""
-        echo -e "${B}-----------------------------------------------${NC}"
-        echo -e "${B}-----------------------------------------------${NC}"
-        echo -e ""
+        echo -e "${B}-----------------------------------------------${NC}\n"
         echo -e "         ${C}Account Deleted Successfully          ${NC}"
         echo -e "${B}-----------------------------------------------${NC}"
-        echo -e "${G}Client Name : ${O}$target_user${NC}"
-        echo -e "${G}Expired On  : ${O}$del_exp_formatted${NC}"
+        echo -e "${G}Client Name : ${O}$target_user\n${G}Expired On  : ${O}$del_exp_formatted${NC}"
         echo -e "${B}-----------------------------------------------${NC}\n"
         echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy
     else
@@ -251,11 +191,9 @@ renew_ssh() {
         clear
         echo -e "${B}-----------------------------------------------${NC}"
         echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
-        echo -e "${B}-----------------------------------------------${NC}"
-        echo -e ""
+        echo -e "${B}-----------------------------------------------${NC}\n"
         echo -e "             ${PINK}SSH-Dropbear-OpenVPN              ${NC}"
-        echo -e "${B}===============================================${NC}"
-        echo -e ""
+        echo -e "${B}===============================================${NC}\n"
         echo -e "${B}===============================================${NC}"
         printf "${O}  %-14s %-15s %s${NC}\n" "USERNAME" "EXP DATE" "STATUS"
         echo -e "${B}===============================================${NC}"
@@ -290,8 +228,8 @@ renew_ssh() {
         fi
         echo -e "${B}===============================================${NC}"
         if [ "$total_acc" -le 1 ]; then echo -e "${O} Total Account: $total_acc user${NC}"; else echo -e "${O} Total Account: $total_acc users${NC}"; fi
-        echo -e "${B}===============================================${NC}"
-        echo -e "\n${G}Press CTRL+C for CANCEL${NC}\n"
+        echo -e "${B}===============================================${NC}\n"
+        echo -e "${G}Press CTRL+C for CANCEL${NC}\n"
         if [ "$total_acc" -eq 0 ]; then echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy; return; fi
 
         if [ "$total_acc" -eq 1 ]; then prompt_range="[1]"; else prompt_range="[1-$total_acc]"; fi
@@ -326,9 +264,7 @@ renew_ssh() {
     sqlite3 "$DB_FILE" "UPDATE users SET exp_date='$new_exp' WHERE username='$target_user' AND protocol='ssh';"
 
     echo -e "\n${B}===============================================${NC}\n"
-    echo -e "${G}Username         :  $target_user${NC}"
-    echo -e "${G}Days Added until :  $ext_days Days${NC}"
-    echo -e "${G}Expires on       :  ${O}$display_exp${NC}"
+    echo -e "${G}Username         :  $target_user\nDays Added until :  $ext_days Days\nExpires on       :  ${O}$display_exp${NC}"
     echo -e "\n${B}===============================================${NC}\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
 }
 
@@ -338,8 +274,7 @@ modify_ssh() {
         clear
         echo -e "${B}-----------------------------------------------${NC}"
         echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
-        echo -e "${B}-----------------------------------------------${NC}"
-        echo -e ""
+        echo -e "${B}-----------------------------------------------${NC}\n"
         echo -e "${B}===============================================${NC}"
         printf "${O}  %-18s %s${NC}\n" "USERNAME" "PASSWORD/UUID"
         echo -e "${B}===============================================${NC}"
@@ -363,8 +298,8 @@ modify_ssh() {
 
         echo -e "${B}===============================================${NC}"
         if [ "$total_acc" -le 1 ]; then echo -e "${O} Total Account: $total_acc user${NC}"; else echo -e "${O} Total Account: $total_acc users${NC}"; fi
-        echo -e "${B}===============================================${NC}"
-        echo -e "\n${G}Press CTRL+C for CANCEL${NC}\n"
+        echo -e "${B}===============================================${NC}\n"
+        echo -e "${G}Press CTRL+C for CANCEL${NC}\n"
         if [ "$total_acc" -eq 0 ]; then echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy; return; fi
 
         if [ "$total_acc" -eq 1 ]; then prompt_range="[1]"; else prompt_range="[1-$total_acc]"; fi
@@ -391,10 +326,7 @@ modify_ssh() {
     echo -e "$target_user:$new_pass" | chpasswd
     sqlite3 "$DB_FILE" "UPDATE users SET password='$new_pass' WHERE username='$target_user' AND protocol='ssh';"
 
-    echo -e "\n${G}Successfully Modify PASSWORD/UUID\n"
-    echo -e "${G}USER          : $target_user${NC}"
-    echo -e "${G}PASSWORD/UUID : $new_pass${NC}\n"
-    echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy
+    echo -e "\n${G}Successfully Modify PASSWORD/UUID\n\nUSER          : $target_user\nPASSWORD/UUID : $new_pass${NC}\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
 }
 
 check_login_ssh() {
@@ -423,8 +355,7 @@ check_login_ssh() {
     if [ "$total_login" -eq 0 ]; then echo -e "${G}           No Active Login${NC}"; fi
     echo -e "${B}-----------------------------------------------${NC}"
     if [ "$total_login" -le 1 ]; then echo -e "${G}       Total Account: $total_login user login${NC}"; else echo -e "${G}       Total Account: $total_login users login${NC}"; fi
-    echo -e "${B}-----------------------------------------------${NC}\n"
-    echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy
+    echo -e "${B}-----------------------------------------------${NC}\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
 }
 
 list_ssh() {
@@ -432,8 +363,7 @@ list_ssh() {
     clear
     echo -e "${B}-----------------------------------------------${NC}"
     echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
-    echo -e "${B}-----------------------------------------------${NC}"
-    echo -e ""
+    echo -e "${B}-----------------------------------------------${NC}\n"
     echo -e "${B}===============================================${NC}"
     printf "${O}  %-14s %-11s %-4s %-4s %s${NC}\n" "USERNAME" "EXP DATE" "QTA" "LMT" "STATUS"
     echo -e "${B}===============================================${NC}"
@@ -470,8 +400,7 @@ list_ssh() {
 
     echo -e "${B}===============================================${NC}"
     if [ "$total_acc" -le 1 ]; then echo -e "${O} Total Account: $total_acc user${NC}"; else echo -e "${O} Total Account: $total_acc users${NC}"; fi
-    echo -e "${B}===============================================${NC}\n\n"
-    echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy
+    echo -e "${B}===============================================${NC}\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
 }
 
 lock_ssh() {
@@ -492,8 +421,7 @@ lock_ssh() {
         clear
         echo -e "${B}-----------------------------------------------${NC}"
         echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
-        echo -e "${B}-----------------------------------------------${NC}"
-        echo -e ""
+        echo -e "${B}-----------------------------------------------${NC}\n"
         echo -e "${B}===============================================${NC}"
         printf "${O}  %-14s %-15s %s${NC}\n" "USERNAME" "EXP DATE" "STATUS"
         echo -e "${B}===============================================${NC}"
@@ -527,8 +455,7 @@ lock_ssh() {
     pkill -u "$target_user" 2>/dev/null
     sqlite3 "$DB_FILE" "UPDATE users SET status='locked' WHERE username='$target_user' AND protocol='ssh';"
 
-    echo -e "\n${G}$target_user locked success${NC}\n\n"
-    echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy
+    echo -e "\n${G}$target_user locked success${NC}\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
 }
 
 unlock_ssh() {
@@ -549,8 +476,7 @@ unlock_ssh() {
         clear
         echo -e "${B}-----------------------------------------------${NC}"
         echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
-        echo -e "${B}-----------------------------------------------${NC}"
-        echo -e ""
+        echo -e "${B}-----------------------------------------------${NC}\n"
         echo -e "${B}===============================================${NC}"
         printf "${O}  %-14s %-15s %s${NC}\n" "USERNAME" "EXP DATE" "STATUS"
         echo -e "${B}===============================================${NC}"
@@ -584,8 +510,7 @@ unlock_ssh() {
     usermod -U "$target_user" 2>/dev/null
     sqlite3 "$DB_FILE" "UPDATE users SET status='active' WHERE username='$target_user' AND protocol='ssh';"
 
-    echo -e "${G}$target_user Unlock success${NC}\n\n"
-    echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy
+    echo -e "${G}$target_user Unlock success${NC}\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
 }
 
 check_config_ssh() {
@@ -594,8 +519,7 @@ check_config_ssh() {
         clear
         echo -e "${B}-----------------------------------------------${NC}"
         echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
-        echo -e "${B}-----------------------------------------------${NC}"
-        echo -e ""
+        echo -e "${B}-----------------------------------------------${NC}\n"
         echo -e "${B}===============================================${NC}"
         printf "${O}  %-14s %-15s %s${NC}\n" "USERNAME" "EXP DATE" "STATUS"
         echo -e "${B}===============================================${NC}"
@@ -631,8 +555,8 @@ check_config_ssh() {
 
         echo -e "${B}===============================================${NC}"
         if [ "$total_acc" -le 1 ]; then echo -e "${O} Total Account: $total_acc user${NC}"; else echo -e "${O} Total Account: $total_acc users${NC}"; fi
-        echo -e "${B}===============================================${NC}"
-        echo -e "\n${R}Press CTRL+C for CANCEL${NC}\n"
+        echo -e "${B}===============================================${NC}\n"
+        echo -e "${R}Press CTRL+C for CANCEL${NC}\n"
         if [ "$total_acc" -eq 0 ]; then echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy; return; fi
 
         if [ "$total_acc" -eq 1 ]; then prompt_range="[1]"; else prompt_range="[1-$total_acc]"; fi
@@ -656,29 +580,12 @@ check_config_ssh() {
     clear
     echo -e "${B}-----------------------------------------------${NC}"
     echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
-    echo -e "${B}-----------------------------------------------${NC}"
-    echo -e ""
+    echo -e "${B}-----------------------------------------------${NC}\n"
     echo -e "${PINK}                SSH/Dropbear                 ${NC}"
     echo -e "${B}-----------------------------------------------${NC}"
-    echo -e "${G}HOST              : $DOMAIN${NC}"
-    echo -e "${G}Username          : $target_user${NC}"
-    echo -e "${G}Password          : $target_pass${NC}"
+    echo -e "${G}HOST              : $DOMAIN\nUsername          : $target_user\nPassword          : $target_pass${NC}"
     echo -e "${B}-----------------------------------------------${NC}"
-    echo -e "${G}TLS               : 443,8443${NC}"
-    echo -e "${G}None TLS          : 80,8080${NC}"
-    echo -e "${G}Any               : 2082,2083,8880${NC}"
-    echo -e "${G}OpenSSH           : 444${NC}"
-    echo -e "${G}Dropbear          : 90,109,143${NC}"
-    echo -e "${G}SlowDNS           : 53,5300${NC}"
-    echo -e "${G}UDP-Custom        : 1-65535${NC}"
-    echo -e "${G}OHP + SSH         : 9080${NC}"
-    echo -e "${G}Squid Proxy       : 3128${NC}"
-    echo -e "${G}BadVPN UDPGW      : 7100-7600${NC}"
-    echo -e "${G}OpenVPN TCP       : 80,1194${NC}"
-    echo -e "${G}OpenVPN SSL       : 443${NC}"
-    echo -e "${G}OpenVPN UDP       : 25000${NC}"
-    echo -e "${G}OpenVPN DNS       : 53${NC}"
-    echo -e "${G}OHP + OVPN        : 9088${NC}"
+    echo -e "${G}TLS               : 443,8443\nNone TLS          : 80,8080\nAny               : 2082,2083,8880\nOpenSSH           : 444\nDropbear          : 90,109,143\nSlowDNS           : 53,5300\nUDP-Custom        : 1-65535\nOHP + SSH         : 9080\nSquid Proxy       : 3128\nBadVPN UDPGW      : 7100-7600\nOpenVPN TCP       : 80,1194\nOpenVPN SSL       : 443\nOpenVPN UDP       : 25000\nOpenVPN DNS       : 53\nOHP + OVPN        : 9088${NC}"
     echo -e "${B}-----------------------------------------------${NC}"
     echo -e "${PINK}                   OpenVPN                   ${NC}"
     echo -e "${B}-----------------------------------------------${NC}"
@@ -687,8 +594,7 @@ check_config_ssh() {
     raw_date="${exp_map[$target_user]}"
     if [[ "$raw_date" == *" "* ]]; then raw_date=$(echo "$raw_date" | cut -d' ' -f1); fi
     echo -e "${O}     Expired  :  $raw_date${NC}"
-    echo -e "${B}-----------------------------------------------${NC}"
-    echo -e "\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
+    echo -e "${B}-----------------------------------------------${NC}\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
 }
 
 edit_limit_ip_ssh() {
@@ -697,8 +603,7 @@ edit_limit_ip_ssh() {
         clear
         echo -e "${B}-----------------------------------------------${NC}"
         echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
-        echo -e "${B}-----------------------------------------------${NC}"
-        echo -e ""
+        echo -e "${B}-----------------------------------------------${NC}\n"
         echo -e "${B}===============================================${NC}"
         printf "${O}  %-14s %-15s %s${NC}\n" "USERNAME" "EXP DATE" "LIMIT IP"
         echo -e "${B}===============================================${NC}"
@@ -727,8 +632,9 @@ edit_limit_ip_ssh() {
 
         echo -e "${B}===============================================${NC}"
         if [ "$total_acc" -le 1 ]; then echo -e "${O} Total Account: $total_acc user${NC}"; else echo -e "${O} Total Account: $total_acc users${NC}"; fi
-        echo -e "${B}===============================================${NC}"
-        echo -e "\n${R}Press CTRL+C for CANCEL${NC}\n"
+        echo -e "${B}===============================================${NC}\n"
+        echo -e "${R}Press CTRL+C for CANCEL${NC}\n"
+        
         if [ "$total_acc" -eq 0 ]; then echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy; return; fi
 
         if [ "$total_acc" -eq 1 ]; then prompt_range="[1]"; else prompt_range="[1-$total_acc]"; fi
@@ -749,8 +655,8 @@ edit_limit_ip_ssh() {
     clear
     echo -e "${B}-----------------------------------------------${NC}"
     echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
-    echo -e "${B}-----------------------------------------------${NC}"
-    echo -e "\n${G} ${C}☞${NC} ${G}$target_user${NC}\n"
+    echo -e "${B}-----------------------------------------------${NC}\n"
+    echo -e "${G} ${C}☞${NC} ${G}$target_user${NC}\n"
     echo -e "${B}-----------------------------------------------${NC}\n"
     
     while true; do echo -ne "${G}Limit (IP) : ${NC}"; read new_limit; if [[ "$new_limit" =~ ^[0-9]+$ ]]; then break; else echo -en "\e[1A\e[K"; fi; done
@@ -765,8 +671,7 @@ edit_limit_ip_all_ssh() {
     clear
     echo -e "${B}-----------------------------------------------${NC}"
     echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
-    echo -e "${B}-----------------------------------------------${NC}"
-    echo -e ""
+    echo -e "${B}-----------------------------------------------${NC}\n"
     echo -e "${B}===============================================${NC}"
     printf "${O}  %-14s %-15s %s${NC}\n" "USERNAME" "EXP DATE" "LIMIT IP"
     echo -e "${B}===============================================${NC}"
@@ -793,8 +698,8 @@ edit_limit_ip_all_ssh() {
 
     echo -e "${B}===============================================${NC}"
     if [ "$total_acc" -le 1 ]; then echo -e "${O} Total Account: $total_acc user${NC}"; else echo -e "${O} Total Account: $total_acc users${NC}"; fi
-    echo -e "${B}===============================================${NC}"
-    echo -e "\n${G}Press CTRL+C for CANCEL${NC}\n"
+    echo -e "${B}===============================================${NC}\n"
+    echo -e "${G}Press CTRL+C for CANCEL${NC}\n"
     if [ "$total_acc" -eq 0 ]; then echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy; return; fi
 
     while true; do echo -ne "${G}Limit (IP) : ${NC}"; read new_limit; if [[ "$new_limit" =~ ^[0-9]+$ ]]; then break; else echo -en "\e[1A\e[K"; fi; done
@@ -810,11 +715,9 @@ recovery_ssh() {
         clear
         echo -e "${B}-----------------------------------------------${NC}"
         echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
-        echo -e "${B}-----------------------------------------------${NC}"
-        echo -e ""
+        echo -e "${B}-----------------------------------------------${NC}\n"
         echo -e "${PINK}                 SSH RECOVERY                  ${NC}"
-        echo -e "${B}-----------------------------------------------${NC}"
-        echo -e ""
+        echo -e "${B}-----------------------------------------------${NC}\n"
         echo -e "${B}===============================================${NC}"
         printf "${O}  %-14s %-15s %s${NC}\n" "USERNAME" "EXP DATE" "STATUS"
         echo -e "${B}===============================================${NC}"
@@ -836,7 +739,6 @@ recovery_ssh() {
                 exp_sys=$(chage -l "$u" 2>/dev/null | grep "Account expires" | cut -d: -f2 | sed 's/^[ \t]*//')
                 exp_sec=$(date -d "$exp_sys" +%s 2>/dev/null)
                 
-                # Hanya masukkan ke recovery jika akun sudah expired
                 if [[ -n "$exp_sec" && "$today_sec" -ge "$exp_sec" ]]; then
                     formatted_date=$(date -d "$exp_sys" +"%d %b,%Y" 2>/dev/null || echo "$exp_sys")
                     orphan_users+=("$u")
@@ -852,10 +754,10 @@ recovery_ssh() {
         echo -e "${B}===============================================${NC}"
         if [ "$total_acc" -le 1 ]; then echo -e "${O} Total Account: $total_acc user${NC}"; else echo -e "${O} Total Account: $total_acc users${NC}"; fi
         echo -e "${B}===============================================${NC}\n"
+        
         if [ "$total_acc" -eq 0 ]; then echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy; return; fi
 
-        echo -e "${G}Input type : deleteallusers${NC}"
-        echo -e "${G}             for Delete All Users RECOVERY${NC}\n"
+        echo -e "${G}Input type : deleteallusers\n             for Delete All Users RECOVERY${NC}\n"
         echo -e "${B}===============================================${NC}\n"
         echo -e "${R}Press CTRL+C for CANCEL${NC}\n"
 
@@ -869,8 +771,7 @@ recovery_ssh() {
                 userdel -f "$u" 2>/dev/null
                 echo -e "${G}Deleted $u${NC}"
             done
-            echo -e "\n${G}Successfully Deleted All Recovery Users${NC}\n\n${PINK}Press Enter for Back to Manage${NC}"
-            read dummy; continue 
+            echo -e "\n${G}Successfully Deleted All Recovery Users${NC}\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy; continue 
         fi
 
         target_user=""
@@ -888,8 +789,8 @@ recovery_ssh() {
     clear
     echo -e "${B}-----------------------------------------------${NC}"
     echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
-    echo -e "${B}-----------------------------------------------${NC}"
-    echo -e "\n${G}You Choose ${O}☞${G} $target_user [RECOVERY]${NC}\n"
+    echo -e "${B}-----------------------------------------------${NC}\n"
+    echo -e "${G}You Choose ${O}☞${G} $target_user [RECOVERY]${NC}\n"
     echo -e "${G}Don't use special characters and uppercase!\n\nJust input a number for-\n Quota Limit\n Limit IP\nFormat GB\n\n${O}0${NC} ${G}for Unlimited\n${O}0${NC} ${G}for No Limit\n\n${R}Press CTRL+C for CANCEL${NC}"
     echo -e "${B}-----------------------------------------------${NC}\n"
     
@@ -909,38 +810,19 @@ recovery_ssh() {
     clear
     echo -e "${B}-----------------------------------------------${NC}"
     echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
-    echo -e "${B}-----------------------------------------------${NC}"
-    echo -e ""
+    echo -e "${B}-----------------------------------------------${NC}\n"
     echo -e "${PINK}                 SSH/Dropbear                  ${NC}"
     echo -e "${B}-----------------------------------------------${NC}"
-    echo -e "${G}HOST        : $DOMAIN${NC}"
-    echo -e "${G}Username    : $target_user${NC}"
-    echo -e "${G}Password    : $old_pass${NC}"
-    echo -e "${G}Limit IP    : $input_limit${NC}"
+    echo -e "${G}HOST        : $DOMAIN\nUsername    : $target_user\nPassword    : $old_pass\nLimit IP    : $input_limit${NC}"
     echo -e "${B}-----------------------------------------------${NC}"
-    echo -e "${G}TLS         : 443,8443${NC}"
-    echo -e "${G}None TLS    : 80,8080${NC}"
-    echo -e "${G}Any         : 2082,2083,8880${NC}"
-    echo -e "${G}OpenSSH     : 444${NC}"
-    echo -e "${G}Dropbear    : 90,109,143${NC}"
-    echo -e "${G}SlowDNS     : 53,5300${NC}"
-    echo -e "${G}UDP-Custom  : 1-65535${NC}"
-    echo -e "${G}OHP + SSH   : 9080${NC}"
-    echo -e "${G}Squid Proxy : 3128${NC}"
-    echo -e "${G}BadVPN UDP  : 7100-7600${NC}"
-    echo -e "${G}OpenVPN TCP : 80,1194${NC}"
-    echo -e "${G}OpenVPN SSL : 443${NC}"
-    echo -e "${G}OpenVPN UDP : 25000${NC}"
-    echo -e "${G}OpenVPN DNS : 53${NC}"
-    echo -e "${G}OHP + OVPN  : 9088${NC}"
+    echo -e "${G}TLS         : 443,8443\nNone TLS    : 80,8080\nAny         : 2082,2083,8880\nOpenSSH     : 444\nDropbear    : 90,109,143\nSlowDNS     : 53,5300\nUDP-Custom  : 1-65535\nOHP + SSH   : 9080\nSquid Proxy : 3128\nBadVPN UDP  : 7100-7600\nOpenVPN TCP : 80,1194\nOpenVPN SSL : 443\nOpenVPN UDP : 25000\nOpenVPN DNS : 53\nOHP + OVPN  : 9088${NC}"
     echo -e "${B}-----------------------------------------------${NC}"
     echo -e "${PINK}                   OpenVPN                   ${NC}"
     echo -e "${B}-----------------------------------------------${NC}"
     echo -e "${G}http://$DOMAIN:81/myvpn-config.zip${NC}"
     echo -e "${B}-----------------------------------------------${NC}"
     echo -e "${O}     Expired  :  $exp${NC}"
-    echo -e "${B}-----------------------------------------------${NC}"
-    echo -e "\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
+    echo -e "${B}-----------------------------------------------${NC}\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
 }
 
 while true; do
@@ -948,34 +830,10 @@ while true; do
     clear
     echo -e "${B}---------------------------------------------${NC}"
     echo -e "            ${G}SSH-Dropbear-OpenVPN             ${NC}"
-    echo -e "${B}---------------------------------------------${NC}"
-    echo -e ""
-    echo -e "  ${G}1.) Create${NC}"
-    echo -e "  ${G}2.) Trial${NC}"
-    echo -e "  ${G}3.) Delete${NC}"
-    echo -e "  ${G}4.) Renew/Extend${NC}"
-    echo -e "  ${G}5.) Modify Password${NC}"
-    echo -e "  ${G}6.) Check Users Login${NC}"
-    echo -e "  ${G}7.) List Users${NC}"
-    echo -e "${B}---------------------------------------------${NC}"
-    echo -e "${BG_BLUE}${G}                LOCK & UNLOCK                ${NC}"
-    echo -e "${B}---------------------------------------------${NC}"
-    echo -e "  ${G}8.) Lock${NC}"
-    echo -e "  ${G}9.) Unlock${NC}"
-    echo -e "${B}---------------------------------------------${NC}"
-    echo -e "${BG_BLUE}${G}                  UTILITIES                  ${NC}"
-    echo -e "${B}---------------------------------------------${NC}"
-    echo -e " ${G}10.) Check Config${NC}"
-    echo -e " ${G}11.) Recovery${NC}"
-    echo -e " ${G}12.) Edit Limit IP${NC}"
-    echo -e " ${G}13.) Edit Limit IP All${NC}"
-    echo -e "${B}---------------------------------------------${NC}"
-    echo -e " ${G}14.) Back to Menu${NC}"
-    echo -e "  ${G}x.) Exit${NC}"
-    echo -e ""
-    echo -e "${B}---------------------------------------------${NC}"
-    echo -e "${B}---------------------------------------------${NC}"
-    echo -e ""
+    echo -e "${B}---------------------------------------------${NC}\n  ${G}1.) Create\n  2.) Trial\n  3.) Delete\n  4.) Renew/Extend\n  5.) Modify Password\n  6.) Check Users Login\n  7.) List Users${NC}\n${B}---------------------------------------------${NC}"
+    echo -e "${BG_BLUE}${G}                LOCK & UNLOCK                ${NC}\n${B}---------------------------------------------${NC}\n  ${G}8.) Lock\n  9.) Unlock${NC}\n${B}---------------------------------------------${NC}"
+    echo -e "${BG_BLUE}${G}                  UTILITIES                  ${NC}\n${B}---------------------------------------------${NC}\n ${G}10.) Check Config\n 11.) Recovery\n 12.) Edit Limit IP\n 13.) Edit Limit IP All${NC}\n${B}---------------------------------------------${NC}"
+    echo -e " ${G}14.) Back to Menu\n  x.) Exit${NC}\n${B}---------------------------------------------${NC}\n${B}---------------------------------------------${NC}\n"
     echo -ne "${G}Select From Options [1-14 or x] : ${NC}"; read opt
     case $opt in
         1) create_ssh ;;
