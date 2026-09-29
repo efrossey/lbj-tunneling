@@ -1,0 +1,62 @@
+#!/bin/bash
+G="\e[92m"; O="\e[93m"; C="\e[36m"; R="\e[91m"; NC="\e[0m"
+DB_FILE="/etc/vpn/database.db"
+DOMAIN=$(cat /etc/vpn/domain.txt 2>/dev/null)
+CITY=$(curl -s4 http://ip-api.com/line?fields=city || curl -s4 https://ipinfo.io/city || echo "Unknown")
+ISP=$(curl -s4 http://ip-api.com/line?fields=isp || curl -s4 https://ipinfo.io/org | cut -d " " -f 2- || echo "Unknown")
+
+create_vless() {
+    clear
+    echo -ne "${G}Username         : ${NC}"; read user
+    echo -ne "${G}Quota Limit (GB) : ${NC}"; read quota
+    echo -ne "${G}Limit (IP)       : ${NC}"; read iplimit
+    echo -ne "${G}Expired (days)   : ${NC}"; read days
+
+    uuid=$(cat /proc/sys/kernel/random/uuid)
+    exp=$(date -d "+$days days" +"%Y-%m-%d")
+    sqlite3 "$DB_FILE" "INSERT INTO users (username, protocol, exp_date, ip_limit, password, quota) VALUES ('$user', 'vless', '$exp', '$iplimit', '$uuid', '$quota');"
+
+    vless_tls="vless://${uuid}@${DOMAIN}:443?path=/vless&security=tls&encryption=none&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
+    vless_ntls="vless://${uuid}@${DOMAIN}:80?path=/vless&security=none&encryption=none&host=${DOMAIN}&type=ws#${user}"
+    vless_grpc="vless://${uuid}@${DOMAIN}:443?mode=gun&security=tls&encryption=none&type=grpc&serviceName=vless&sni=${DOMAIN}#${user}"
+    vless_uptls="vless://${uuid}@${DOMAIN}:443?path=/upvless&security=tls&encryption=none&host=${DOMAIN}&type=httpupgrade&sni=${DOMAIN}#${user}"
+    vless_upntls="vless://${uuid}@${DOMAIN}:80?path=/upvless&security=none&encryption=none&host=${DOMAIN}&type=httpupgrade#${user}"
+
+    clear
+    echo -e " ————————————————————————————————————————"
+    echo -e "             LBJ Tunneling             "
+    echo -e " ————————————————————————————————————————\n"
+    echo -e "                XRAY VLESS"
+    echo -e " ————————————————————————————————————————\n"
+    echo -e " VLESS\n"
+    echo -e " Remarks       : ${user}"
+    echo -e " CITY          : ${CITY}"
+    echo -e " ISP           : ${ISP}"
+    echo -e " Domain        : ${DOMAIN}"
+    echo -e " Port TLS      : 443,8443"
+    echo -e " Port none TLS : 80,8080"
+    echo -e " Port any      : 2052,2053,8880"
+    echo -e " id            : ${uuid}"
+    echo -e " Encryption    : none"
+    echo -e " Network       : ws,grpc,upgrade"
+    echo -e " Path ws       : /vless"
+    echo -e " serviceName   : vless"
+    echo -e " Path upgrade  : /upvless\n"
+    echo -e " ————————————————————————————————————————"
+    echo -e " Link TLS         : ${vless_tls}"
+    echo -e " ————————————————————————————————————————"
+    echo -e " Link none TLS    : ${vless_ntls}"
+    echo -e " ————————————————————————————————————————"
+    echo -e " Link GRPC        : ${vless_grpc}"
+    echo -e " ————————————————————————————————————————"
+    echo -e " Link Upgrade TLS : ${vless_uptls}"
+    echo -e " ————————————————————————————————————————"
+    echo -e " Link Upgrade nTLS: ${vless_upntls}"
+    echo -e " ————————————————————————————————————————"
+    echo -e "         Expired  :  ${exp}"
+    echo -e " ————————————————————————————————————————\n"
+    read -p "Press Enter to return..." dummy
+}
+
+# (Bisa tambahkan loop menu disini seperti m-vmess)
+create_vless
