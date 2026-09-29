@@ -1,0 +1,1000 @@
+cat > /usr/bin/m-ssh << 'EOF'
+#!/bin/bash
+G="\e[92m"; O="\e[93m"; C="\e[36m"; B="\e[36m"; P="\e[35m"; PINK="\e[95m"; BG_RED="\e[41m"; BG_BLUE="\e[44m"; R="\e[91m"; NC="\e[0m"
+DB_FILE="/etc/vpn/database.db"
+DOMAIN=$(cat /etc/vpn/domain.txt 2>/dev/null)
+
+create_ssh() {
+    trap 'echo -e "\n"; return' INT
+    while true; do
+        clear
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "${G}Just input a number for Limit IP${NC}"
+        echo -e ""
+        echo -e "${G}0 for No Limit${NC}"
+        echo -e ""
+        echo -e "${R}Press CTRL+C for CANCEL${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        
+        echo -ne "${G}Username      : ${NC}"; read user
+        if [[ -z "$user" ]]; then continue; fi
+        
+        if [[ ${#user} -lt 3 ]] || [[ ${#user} -gt 17 ]]; then
+            echo -e "\n${R}Minimum 3 characters\nMaximum 17 characters\nTry again in 2 second${NC}\n"; sleep 2; continue
+        elif [[ ! "$user" =~ ^[a-z0-9]+$ ]]; then
+            echo -e "\n${R}Don't use special characters and uppercase!\nTry again in 2 seconds${NC}\n"; sleep 2; continue
+        fi
+
+        db_check=$(sqlite3 "$DB_FILE" "SELECT username FROM users WHERE username='$user' AND protocol='ssh';")
+        if [[ -n "$db_check" ]]; then
+            echo -e "\n${G}Username      : ${O}${user}${NC}\n${G}Status        : ${G}Already Exists\n\nTry again in 2 seconds${NC}\n"; sleep 2; continue
+        else break; fi
+    done
+    
+    while true; do echo -ne "${G}Password      : ${NC}"; read pass; if [ -n "$pass" ]; then break; else echo -en "\e[1A\e[K"; fi; done
+    while true; do echo -ne "${G}Quota (GB)    : ${NC}"; read quota; if [[ "$quota" =~ ^[0-9]+$ ]]; then break; else echo -en "\e[1A\e[K"; fi; done
+    while true; do echo -ne "${G}Limit (IP)    : ${NC}"; read iplimit; if [[ "$iplimit" =~ ^[0-9]+$ ]]; then break; else echo -en "\e[1A\e[K"; fi; done
+    while true; do echo -ne "${G}Expired (day) : ${NC}"; read days; if [[ "$days" =~ ^[0-9]+$ ]]; then break; else echo -en "\e[1A\e[K"; fi; done
+
+    exp=$(date -d "+$days days" +"%Y-%m-%d")
+    useradd -e $exp -s /bin/false -M $user 2>/dev/null
+    echo -e "$user:$pass" | chpasswd
+    sqlite3 "$DB_FILE" "INSERT INTO users (username, protocol, exp_date, ip_limit, password, quota) VALUES ('$user', 'ssh', '$exp', '$iplimit', '$pass', '$quota');"
+
+    clear
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e ""
+    echo -e "${PINK}                 SSH/Dropbear                  ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}HOST              : $DOMAIN${NC}"
+    echo -e "${G}Username          : $user${NC}"
+    echo -e "${G}Password          : $pass${NC}"
+    echo -e "${G}Quota             : ${quota}GB${NC}"
+    echo -e "${G}Limit IP          : $iplimit${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}TLS               : 443,8443${NC}"
+    echo -e "${G}None TLS          : 80,8080${NC}"
+    echo -e "${G}Any               : 2082,2083,8880${NC}"
+    echo -e "${G}OpenSSH           : 444${NC}"
+    echo -e "${G}Dropbear          : 90,109,143${NC}"
+    echo -e "${G}SlowDNS           : 53,5300${NC}"
+    echo -e "${G}UDP-Custom        : 1-65535${NC}"
+    echo -e "${G}OHP + SSH         : 9080${NC}"
+    echo -e "${G}Squid Proxy       : 3128${NC}"
+    echo -e "${G}BadVPN UDPGW      : 7100-7600${NC}"
+    echo -e "${G}OpenVPN TCP       : 80,1194${NC}"
+    echo -e "${G}OpenVPN SSL       : 443${NC}"
+    echo -e "${G}OpenVPN UDP       : 25000${NC}"
+    echo -e "${G}OpenVPN DNS       : 53${NC}"
+    echo -e "${G}OHP + OVPN        : 9088${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${PINK}                    OpenVPN                    ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}http://$DOMAIN:81/myvpn-config.zip${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${O}         Expired  :  $exp${NC}"
+    echo -e "${B}-----------------------------------------------${NC}\n"
+    echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy
+}
+
+trial_ssh() {
+    trap 'echo -e "\n"; return' INT
+    clear
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e ""
+    echo -e "${G}Time Format :${NC}"
+    echo -e ""
+    echo -e "${G}  h - H (Hours)\n  m - M (Minutes)${NC}"
+    echo -e ""
+    echo -e "${G}Example : ${O}1h${NC} ${G}for 1 hours${NC}"
+    echo -e ""
+    echo -e "${R}Press CTRL+C for CANCEL${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e ""
+    
+    while true; do
+        echo -ne "${G}Trial Time       : ${NC}"; read trial_time
+        unit=$(echo $trial_time | grep -o -i '[a-z]')
+        val=$(echo $trial_time | grep -o '[0-9]*')
+        if [[ "${unit,,}" == "h" ]] && [ -n "$val" ]; then
+            exp_display="$val Hour"; exp_db=$(date -d "+$val hour" +"%Y-%m-%d %H:%M:%S"); exp_sys=$(date -d "+1 day" +"%Y-%m-%d"); break
+        elif [[ "${unit,,}" == "m" ]] && [ -n "$val" ]; then
+            exp_display="$val Minute"; exp_db=$(date -d "+$val minute" +"%Y-%m-%d %H:%M:%S"); exp_sys=$(date -d "+1 day" +"%Y-%m-%d"); break
+        else echo -en "\e[1A\e[K"; fi
+    done
+
+    user="trial-$(tr -dc 'a-z0-9' < /dev/urandom | head -c 8)"
+    pass=$(tr -dc 'a-z0-9' < /dev/urandom | head -c 8)
+    
+    useradd -e $exp_sys -s /bin/false -M $user 2>/dev/null
+    echo -e "$user:$pass" | chpasswd
+    sqlite3 "$DB_FILE" "INSERT INTO users (username, protocol, exp_date, ip_limit, password) VALUES ('$user', 'ssh', '$exp_db', '1', '$pass');"
+
+    clear
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e ""
+    echo -e "${PINK}                 SSH/Dropbear                  ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}HOST              : $DOMAIN${NC}"
+    echo -e "${G}Username          : $user${NC}"
+    echo -e "${G}Password          : $pass${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}TLS               : 443,8443${NC}"
+    echo -e "${G}None TLS          : 80,8080${NC}"
+    echo -e "${G}Any               : 2082,2083,8880${NC}"
+    echo -e "${G}OpenSSH           : 444${NC}"
+    echo -e "${G}Dropbear          : 90,109,143${NC}"
+    echo -e "${G}SlowDNS           : 53,5300${NC}"
+    echo -e "${G}UDP-Custom        : 1-65535${NC}"
+    echo -e "${G}OHP + SSH         : 9080${NC}"
+    echo -e "${G}Squid Proxy       : 3128${NC}"
+    echo -e "${G}BadVPN UDPGW      : 7100-7600${NC}"
+    echo -e "${G}OpenVPN TCP       : 80,1194${NC}"
+    echo -e "${G}OpenVPN SSL       : 443${NC}"
+    echo -e "${G}OpenVPN UDP       : 25000${NC}"
+    echo -e "${G}OpenVPN DNS       : 53${NC}"
+    echo -e "${G}OHP + OVPN        : 9088${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${PINK}                    OpenVPN                    ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}http://$DOMAIN:81/myvpn-config.zip${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${O}         Expired  :  $exp_display${NC}"
+    echo -e "${B}-----------------------------------------------${NC}\n"
+    echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy
+}
+
+delete_ssh() {
+    trap 'echo -e "\n"; return' INT
+    while true; do
+        clear
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "             ${PINK}SSH-Dropbear-OpenVPN              ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "${B}===============================================${NC}"
+        printf "${O}  %-14s %-15s %s${NC}\n" "USERNAME" "EXP DATE" "STATUS"
+        echo -e "${B}===============================================${NC}"
+
+        mapfile -t ssh_users < <(sqlite3 "$DB_FILE" "SELECT username, exp_date, status FROM users WHERE protocol='ssh';")
+        total_acc=${#ssh_users[@]}
+
+        declare -A user_map
+        declare -A exp_map
+        if [ "$total_acc" -eq 0 ]; then echo -e "${G}              No User Found                    ${NC}"
+        else
+            i=1
+            for user_data in "${ssh_users[@]}"; do
+                username=$(echo "$user_data" | awk -F'|' '{print $1}')
+                exp_date=$(echo "$user_data" | awk -F'|' '{print $2}')
+                status_db=$(echo "$user_data" | awk -F'|' '{print $3}')
+                if [[ "$exp_date" == *" "* ]]; then
+                    clean_date=$(echo "$exp_date" | cut -d' ' -f1); formatted_date=$(date -d "$clean_date" +"%d %b,%Y" 2>/dev/null || echo "$exp_date")
+                else formatted_date=$(date -d "$exp_date" +"%d %b,%Y" 2>/dev/null || echo "$exp_date"); fi
+                status_show="UNLOCKED"
+                if [ "$status_db" == "locked" ]; then status_show="LOCKED"; fi
+                printf "${G}%2d) %-14s %-15s %s${NC}\n" "$i" "${username:0:14}" "$formatted_date" "$status_show"
+                user_map[$i]="$username"
+                exp_map[$username]="$exp_date"
+                ((i++))
+            done
+        fi
+        echo -e "${B}===============================================${NC}"
+        if [ "$total_acc" -le 1 ]; then echo -e "${O} Total Account: $total_acc user${NC}"; else echo -e "${O} Total Account: $total_acc users${NC}"; fi
+        echo -e "${B}===============================================${NC}"
+        echo -e "\n${G}Press CTRL+C for CANCEL${NC}\n"
+        
+        if [ "$total_acc" -eq 0 ]; then echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy; return; fi
+
+        if [ "$total_acc" -eq 1 ]; then prompt_range="[1]"; else prompt_range="[1-$total_acc]"; fi
+        echo -ne "${G}Select client $prompt_range or [user]: ${NC}"; read client_opt
+
+        target_user=""
+        valid_user=0
+        if [[ "$client_opt" =~ ^[0-9]+$ ]] && [ "$client_opt" -le "$total_acc" ] && [ "$client_opt" -gt 0 ]; then
+            target_user="${user_map[$client_opt]}"; del_exp="${exp_map[$target_user]}"; valid_user=1
+        else
+            for i in "${!user_map[@]}"; do
+                if [ "${user_map[$i]}" == "$client_opt" ]; then
+                    target_user="$client_opt"; del_exp="${exp_map[$target_user]}"; valid_user=1; break
+                fi
+            done
+        fi
+        if [ "$valid_user" -eq 0 ]; then echo -e "\n${R}User Not Found\nTry again in 2 second${NC}\n"; sleep 2; continue; else break; fi
+    done
+
+    echo -e "\n${G}You Choose ${C}☞${NC} ${G}$target_user [delete]${NC}\n"
+    echo -ne "${G}Correct (y) ? ${NC}"; read confirm
+
+    if [[ "${confirm,,}" == "y" ]]; then
+        userdel -f "$target_user" 2>/dev/null
+        sqlite3 "$DB_FILE" "DELETE FROM users WHERE username='$target_user' AND protocol='ssh';"
+        if [[ "$del_exp" == *" "* ]]; then
+            clean_date=$(echo "$del_exp" | cut -d' ' -f1); del_exp_formatted=$(date -d "$clean_date" +"%Y-%m-%d" 2>/dev/null || echo "$del_exp")
+        else del_exp_formatted=$(date -d "$del_exp" +"%Y-%m-%d" 2>/dev/null || echo "$del_exp"); fi
+
+        clear
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "         ${C}Account Deleted Successfully          ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "${G}Client Name : ${O}$target_user${NC}"
+        echo -e "${G}Expired On  : ${O}$del_exp_formatted${NC}"
+        echo -e "${B}-----------------------------------------------${NC}\n"
+        echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy
+    else
+        echo -e "\n${R}Canceled.\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
+    fi
+}
+
+renew_ssh() {
+    trap 'echo -e "\n"; return' INT
+    while true; do
+        clear
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "             ${PINK}SSH-Dropbear-OpenVPN              ${NC}"
+        echo -e "${B}===============================================${NC}"
+        echo -e ""
+        echo -e "${B}===============================================${NC}"
+        printf "${O}  %-14s %-15s %s${NC}\n" "USERNAME" "EXP DATE" "STATUS"
+        echo -e "${B}===============================================${NC}"
+
+        mapfile -t ssh_users < <(sqlite3 "$DB_FILE" "SELECT username, exp_date, status FROM users WHERE protocol='ssh';")
+        total_acc=${#ssh_users[@]}
+
+        declare -A user_map
+        declare -A exp_map
+        if [ "$total_acc" -eq 0 ]; then echo -e "${G}              No User Found                    ${NC}"
+        else
+            i=1
+            for user_data in "${ssh_users[@]}"; do
+                username=$(echo "$user_data" | awk -F'|' '{print $1}')
+                exp_date=$(echo "$user_data" | awk -F'|' '{print $2}')
+                status_db=$(echo "$user_data" | awk -F'|' '{print $3}')
+                
+                exp_sec=$(date -d "$exp_date" +%s 2>/dev/null)
+                today_sec=$(date +%s)
+                if [[ -n "$exp_sec" && "$today_sec" -ge "$exp_sec" ]]; then continue; fi
+
+                if [[ "$exp_date" == *" "* ]]; then
+                    clean_date=$(echo "$exp_date" | cut -d' ' -f1); formatted_date=$(date -d "$clean_date" +"%d %b,%Y" 2>/dev/null || echo "$exp_date")
+                else formatted_date=$(date -d "$exp_date" +"%d %b,%Y" 2>/dev/null || echo "$exp_date"); fi
+                status_show="UNLOCKED"
+                if [ "$status_db" == "locked" ]; then status_show="LOCKED"; fi
+                printf "${G}%2d) %-14s %-15s %s${NC}\n" "$i" "${username:0:14}" "$formatted_date" "$status_show"
+                user_map[$i]="$username"
+                exp_map[$username]="$exp_date"
+                ((i++))
+            done
+        fi
+        echo -e "${B}===============================================${NC}"
+        if [ "$total_acc" -le 1 ]; then echo -e "${O} Total Account: $total_acc user${NC}"; else echo -e "${O} Total Account: $total_acc users${NC}"; fi
+        echo -e "${B}===============================================${NC}"
+        echo -e "\n${G}Press CTRL+C for CANCEL${NC}\n"
+        if [ "$total_acc" -eq 0 ]; then echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy; return; fi
+
+        if [ "$total_acc" -eq 1 ]; then prompt_range="[1]"; else prompt_range="[1-$total_acc]"; fi
+        echo -ne "${G}Select client $prompt_range or [user]: ${NC}"; read client_opt
+
+        target_user=""
+        valid_user=0
+        if [[ "$client_opt" =~ ^[0-9]+$ ]] && [ "$client_opt" -le "$total_acc" ] && [ "$client_opt" -gt 0 ]; then
+            target_user="${user_map[$client_opt]}"; valid_user=1
+        else
+            for i in "${!user_map[@]}"; do
+                if [ "${user_map[$i]}" == "$client_opt" ]; then target_user="$client_opt"; valid_user=1; break; fi
+            done
+        fi
+        if [ "$valid_user" -eq 0 ]; then echo -e "\n${R}User Not Found\nTry again in 2 second${NC}\n"; sleep 2; continue; else break; fi
+    done
+
+    echo -e "\n${G}You Choose ${C}☞${NC} ${G}$target_user [renew]${NC}\n"
+    while true; do echo -ne "${G}Day   Extend     :  ${NC}"; read ext_days; if [[ "$ext_days" =~ ^[0-9]+$ ]]; then break; else echo -en "\e[1A\e[K"; fi; done
+
+    old_exp="${exp_map[$target_user]}"
+    if [[ "$old_exp" == *" "* ]]; then old_exp=$(echo "$old_exp" | cut -d' ' -f1); fi
+
+    old_exp_sec=$(date -d "$old_exp" +%s 2>/dev/null)
+    today_sec=$(date +%s)
+    if [[ -n "$old_exp_sec" && "$old_exp_sec" -gt "$today_sec" ]]; then
+        new_exp=$(date -d "$old_exp + $ext_days days" +"%Y-%m-%d")
+    else new_exp=$(date -d "+$ext_days days" +"%Y-%m-%d"); fi
+
+    display_exp=$(date -d "$new_exp" +"%d %b, %Y")
+    usermod -e "$new_exp" "$target_user" 2>/dev/null
+    sqlite3 "$DB_FILE" "UPDATE users SET exp_date='$new_exp' WHERE username='$target_user' AND protocol='ssh';"
+
+    echo -e "\n${B}===============================================${NC}\n"
+    echo -e "${G}Username         :  $target_user${NC}"
+    echo -e "${G}Days Added until :  $ext_days Days${NC}"
+    echo -e "${G}Expires on       :  ${O}$display_exp${NC}"
+    echo -e "\n${B}===============================================${NC}\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
+}
+
+modify_ssh() {
+    trap 'echo -e "\n"; return' INT
+    while true; do
+        clear
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "${B}===============================================${NC}"
+        printf "${O}  %-18s %s${NC}\n" "USERNAME" "PASSWORD/UUID"
+        echo -e "${B}===============================================${NC}"
+        
+        mapfile -t ssh_users < <(sqlite3 "$DB_FILE" "SELECT username, password FROM users WHERE protocol='ssh';")
+        total_acc=${#ssh_users[@]}
+
+        declare -A user_map
+        if [ "$total_acc" -eq 0 ]; then echo -e "${G}              No User Found                    ${NC}"
+        else
+            i=1
+            for user_data in "${ssh_users[@]}"; do
+                username=$(echo "$user_data" | awk -F'|' '{print $1}')
+                pass=$(echo "$user_data" | awk -F'|' '{print $2}')
+                if [ -z "$pass" ] || [ "$pass" == " " ]; then pass="[Belum Terekam]"; fi
+                printf "${G}%2d) %-18s %s${NC}\n" "$i" "${username:0:18}" "$pass"
+                user_map[$i]="$username"
+                ((i++))
+            done
+        fi
+
+        echo -e "${B}===============================================${NC}"
+        if [ "$total_acc" -le 1 ]; then echo -e "${O} Total Account: $total_acc user${NC}"; else echo -e "${O} Total Account: $total_acc users${NC}"; fi
+        echo -e "${B}===============================================${NC}"
+        echo -e "\n${G}Press CTRL+C for CANCEL${NC}\n"
+        if [ "$total_acc" -eq 0 ]; then echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy; return; fi
+
+        if [ "$total_acc" -eq 1 ]; then prompt_range="[1]"; else prompt_range="[1-$total_acc]"; fi
+        echo -ne "${G}Select client $prompt_range or [user]: ${NC}"; read client_opt
+
+        target_user=""
+        valid_user=0
+        if [[ "$client_opt" =~ ^[0-9]+$ ]] && [ "$client_opt" -le "$total_acc" ] && [ "$client_opt" -gt 0 ]; then
+            target_user="${user_map[$client_opt]}"; valid_user=1
+        else
+            for u in "${user_map[@]}"; do
+                if [ "$u" == "$client_opt" ]; then target_user="$client_opt"; valid_user=1; break; fi
+            done
+        fi
+        if [ "$valid_user" -eq 0 ]; then echo -e "\n${R}User Not Found\nTry again in 2 second${NC}\n"; sleep 2; continue; else break; fi
+    done
+
+    echo -e "\n${G}You Choose ${C}☞${NC} ${G}$target_user${NC}\n"
+    echo -e "${G}Maximum PASSWORD/UUID 36\nand\nPASSWORD/UUID No Blank${NC}"
+    echo -e "${B}-----------------------------------------------${NC}\n"
+    
+    while true; do echo -ne "${G}PASSWORD/UUID : ${NC}"; read new_pass; if [ -n "$new_pass" ]; then break; else echo -en "\e[1A\e[K"; fi; done
+
+    echo -e "$target_user:$new_pass" | chpasswd
+    sqlite3 "$DB_FILE" "UPDATE users SET password='$new_pass' WHERE username='$target_user' AND protocol='ssh';"
+
+    echo -e "\n${G}Successfully Modify PASSWORD/UUID\n"
+    echo -e "${G}USER          : $target_user${NC}"
+    echo -e "${G}PASSWORD/UUID : $new_pass${NC}\n"
+    echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy
+}
+
+check_login_ssh() {
+    trap 'echo -e "\n"; return' INT
+    clear
+    echo -e "${PINK}               SSH USER LOGIN                  ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    printf "${G}  %-14s %-7s %-7s %s${NC}\n" "USER" "USAGE" "TOTAL" "LOG"
+    echo -e "${B}-----------------------------------------------${NC}"
+    
+    mapfile -t active_pids < <(netstat -anp 2>/dev/null | grep ESTABLISHED | grep -E 'sshd|dropbear' | awk '{print $7}' | cut -d'/' -f1 | sort | uniq)
+    total_login=0
+    for pid in "${active_pids[@]}"; do
+        if [ -n "$pid" ]; then
+            user=$(ps -o user= -p "$pid" 2>/dev/null | awk '{print $1}')
+            if [[ -n "$user" && "$user" != "root" && "$user" != "sshd" && "$user" != "messagebus" ]]; then
+                usage="0GB"
+                ips=$(netstat -anp 2>/dev/null | grep " $pid/" | wc -l)
+                log_id=$RANDOM
+                printf "${G}  %-14s %-7s %-7s %s${NC}\n" "${user:0:14}" "$usage" "$ips IP" "$log_id"
+                ((total_login++))
+            fi
+        fi
+    done
+
+    if [ "$total_login" -eq 0 ]; then echo -e "${G}           No Active Login${NC}"; fi
+    echo -e "${B}-----------------------------------------------${NC}"
+    if [ "$total_login" -le 1 ]; then echo -e "${G}       Total Account: $total_login user login${NC}"; else echo -e "${G}       Total Account: $total_login users login${NC}"; fi
+    echo -e "${B}-----------------------------------------------${NC}\n"
+    echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy
+}
+
+list_ssh() {
+    trap 'echo -e "\n"; return' INT
+    clear
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e ""
+    echo -e "${B}===============================================${NC}"
+    printf "${O}  %-14s %-11s %-4s %-4s %s${NC}\n" "USERNAME" "EXP DATE" "QTA" "LMT" "STATUS"
+    echo -e "${B}===============================================${NC}"
+
+    mapfile -t ssh_users < <(sqlite3 "$DB_FILE" "SELECT username, exp_date, ip_limit, status, quota FROM users WHERE protocol='ssh';")
+    total_acc=${#ssh_users[@]}
+
+    if [ "$total_acc" -eq 0 ]; then echo -e "${G}              No User Found                    ${NC}"
+    else
+        i=1
+        for user_data in "${ssh_users[@]}"; do
+            username=$(echo "$user_data" | awk -F'|' '{print $1}')
+            exp_date=$(echo "$user_data" | awk -F'|' '{print $2}')
+            limit=$(echo "$user_data" | awk -F'|' '{print $3}')
+            status_db=$(echo "$user_data" | awk -F'|' '{print $4}')
+            quota=$(echo "$user_data" | awk -F'|' '{print $5}')
+            
+            if [[ "$exp_date" == *" "* ]]; then
+                clean_date=$(echo "$exp_date" | cut -d' ' -f1); formatted_date=$(date -d "$clean_date" +"%d %b,%y" 2>/dev/null || echo "$exp_date")
+            else formatted_date=$(date -d "$exp_date" +"%d %b,%y" 2>/dev/null || echo "$exp_date"); fi
+            
+            status_show=""
+            if [ "$status_db" == "locked" ]; then status_show="LOCK"; fi
+            
+            l_str="${limit}"
+            [ -z "$limit" ] || [ "$limit" == "0" ] && l_str="UL"
+            q_str="${quota}GB"
+            [ -z "$quota" ] || [ "$quota" == "0" ] && q_str="UL"
+            
+            printf "${G}%2d) %-14s %-11s %-4s %-4s %s${NC}\n" "$i" "${username:0:14}" "${formatted_date:0:11}" "$q_str" "$l_str" "$status_show"
+            ((i++))
+        done
+    fi
+
+    echo -e "${B}===============================================${NC}"
+    if [ "$total_acc" -le 1 ]; then echo -e "${O} Total Account: $total_acc user${NC}"; else echo -e "${O} Total Account: $total_acc users${NC}"; fi
+    echo -e "${B}===============================================${NC}\n\n"
+    echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy
+}
+
+lock_ssh() {
+    trap 'echo -e "\n"; return' INT
+    while true; do
+        mapfile -t ssh_users < <(sqlite3 "$DB_FILE" "SELECT username, exp_date, status FROM users WHERE protocol='ssh' AND (status IS NULL OR status != 'locked');")
+        total_acc=${#ssh_users[@]}
+
+        if [ "$total_acc" -eq 0 ]; then
+            clear
+            echo -e "${B}-----------------------------------------------${NC}"
+            echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+            echo -e "${B}-----------------------------------------------${NC}"
+            echo -e "\n${R}You don't have an active accounts${NC}\n"
+            sleep 2; return
+        fi
+
+        clear
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "${B}===============================================${NC}"
+        printf "${O}  %-14s %-15s %s${NC}\n" "USERNAME" "EXP DATE" "STATUS"
+        echo -e "${B}===============================================${NC}"
+
+        declare -a u_list
+        i=1
+        for user_data in "${ssh_users[@]}"; do
+            username=$(echo "$user_data" | awk -F'|' '{print $1}')
+            exp_date=$(echo "$user_data" | awk -F'|' '{print $2}')
+            
+            if [[ "$exp_date" == *" "* ]]; then
+                clean_date=$(echo "$exp_date" | cut -d' ' -f1); formatted_date=$(date -d "$clean_date" +"%d %b,%Y" 2>/dev/null || echo "$exp_date")
+            else formatted_date=$(date -d "$exp_date" +"%d %b,%Y" 2>/dev/null || echo "$exp_date"); fi
+            
+            status_show="UNLOCKED"
+            printf "${G}%2d) %-14s %-15s %s${NC}\n" "$i" "${username:0:14}" "$formatted_date" "$status_show"
+            u_list+=("$username")
+            ((i++))
+        done
+        echo -e "${B}===============================================${NC}\n"
+        
+        echo -ne "${G}          Username : ${NC}"; read target_user
+        valid_user=0
+        for u in "${u_list[@]}"; do
+            if [ "$u" == "$target_user" ]; then valid_user=1; break; fi
+        done
+        if [ "$valid_user" -eq 0 ]; then echo -e "\n${R}User Not Found\nTry again in 2 second${NC}\n"; sleep 2; continue; else break; fi
+    done
+
+    usermod -L "$target_user" 2>/dev/null
+    pkill -u "$target_user" 2>/dev/null
+    sqlite3 "$DB_FILE" "UPDATE users SET status='locked' WHERE username='$target_user' AND protocol='ssh';"
+
+    echo -e "\n${G}$target_user locked success${NC}\n\n"
+    echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy
+}
+
+unlock_ssh() {
+    trap 'echo -e "\n"; return' INT
+    while true; do
+        mapfile -t ssh_users < <(sqlite3 "$DB_FILE" "SELECT username, exp_date, status FROM users WHERE protocol='ssh' AND status='locked';")
+        total_acc=${#ssh_users[@]}
+
+        if [ "$total_acc" -eq 0 ]; then
+            clear
+            echo -e "${B}-----------------------------------------------${NC}"
+            echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+            echo -e "${B}-----------------------------------------------${NC}"
+            echo -e "\n${R}You don't have an locked accounts${NC}\n"
+            sleep 2; return
+        fi
+
+        clear
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "${B}===============================================${NC}"
+        printf "${O}  %-14s %-15s %s${NC}\n" "USERNAME" "EXP DATE" "STATUS"
+        echo -e "${B}===============================================${NC}"
+
+        declare -a u_list
+        i=1
+        for user_data in "${ssh_users[@]}"; do
+            username=$(echo "$user_data" | awk -F'|' '{print $1}')
+            exp_date=$(echo "$user_data" | awk -F'|' '{print $2}')
+            
+            if [[ "$exp_date" == *" "* ]]; then
+                clean_date=$(echo "$exp_date" | cut -d' ' -f1); formatted_date=$(date -d "$clean_date" +"%d %b,%Y" 2>/dev/null || echo "$exp_date")
+            else formatted_date=$(date -d "$exp_date" +"%d %b,%Y" 2>/dev/null || echo "$exp_date"); fi
+            
+            status_show="LOCKED"
+            printf "${G}%2d) %-14s %-15s %s${NC}\n" "$i" "${username:0:14}" "$formatted_date" "$status_show"
+            u_list+=("$username")
+            ((i++))
+        done
+        echo -e "${B}===============================================${NC}\n"
+        
+        echo -ne "${G}          Username : ${NC}"; read target_user
+        valid_user=0
+        for u in "${u_list[@]}"; do
+            if [ "$u" == "$target_user" ]; then valid_user=1; break; fi
+        done
+        if [ "$valid_user" -eq 0 ]; then echo -e "\n${R}User Not Found\nTry again in 2 second${NC}\n"; sleep 2; continue; else break; fi
+    done
+
+    echo -e "\n${G}Waiting...${NC}\n"
+    usermod -U "$target_user" 2>/dev/null
+    sqlite3 "$DB_FILE" "UPDATE users SET status='active' WHERE username='$target_user' AND protocol='ssh';"
+
+    echo -e "${G}$target_user Unlock success${NC}\n\n"
+    echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy
+}
+
+check_config_ssh() {
+    trap 'echo -e "\n"; return' INT
+    while true; do
+        clear
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "${B}===============================================${NC}"
+        printf "${O}  %-14s %-15s %s${NC}\n" "USERNAME" "EXP DATE" "STATUS"
+        echo -e "${B}===============================================${NC}"
+
+        mapfile -t ssh_users < <(sqlite3 "$DB_FILE" "SELECT username, exp_date, status, password FROM users WHERE protocol='ssh';")
+        total_acc=${#ssh_users[@]}
+
+        declare -A user_map
+        declare -A pass_map
+        declare -A exp_map
+        if [ "$total_acc" -eq 0 ]; then echo -e "${G}             No User Found                     ${NC}"
+        else
+            i=1
+            for user_data in "${ssh_users[@]}"; do
+                username=$(echo "$user_data" | awk -F'|' '{print $1}')
+                exp_date=$(echo "$user_data" | awk -F'|' '{print $2}')
+                status_db=$(echo "$user_data" | awk -F'|' '{print $3}')
+                pass_db=$(echo "$user_data" | awk -F'|' '{print $4}')
+                
+                if [[ "$exp_date" == *" "* ]]; then
+                    clean_date=$(echo "$exp_date" | cut -d' ' -f1); formatted_date=$(date -d "$clean_date" +"%d %b,%Y" 2>/dev/null || echo "$exp_date")
+                else formatted_date=$(date -d "$exp_date" +"%d %b,%Y" 2>/dev/null || echo "$exp_date"); fi
+                status_show="UNLOCKED"
+                if [ "$status_db" == "locked" ]; then status_show="LOCKED"; fi
+                
+                printf "${G}%2d) %-14s %-15s %s${NC}\n" "$i" "${username:0:14}" "$formatted_date" "$status_show"
+                user_map[$i]="$username"
+                pass_map[$username]="$pass_db"
+                exp_map[$username]="$exp_date"
+                ((i++))
+            done
+        fi
+
+        echo -e "${B}===============================================${NC}"
+        if [ "$total_acc" -le 1 ]; then echo -e "${O} Total Account: $total_acc user${NC}"; else echo -e "${O} Total Account: $total_acc users${NC}"; fi
+        echo -e "${B}===============================================${NC}"
+        echo -e "\n${R}Press CTRL+C for CANCEL${NC}\n"
+        if [ "$total_acc" -eq 0 ]; then echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy; return; fi
+
+        if [ "$total_acc" -eq 1 ]; then prompt_range="[1]"; else prompt_range="[1-$total_acc]"; fi
+        echo -ne "${G}Select client $prompt_range or [user]: ${NC}"; read client_opt
+
+        target_user=""
+        valid_user=0
+        if [[ "$client_opt" =~ ^[0-9]+$ ]] && [ "$client_opt" -le "$total_acc" ] && [ "$client_opt" -gt 0 ]; then
+            target_user="${user_map[$client_opt]}"; valid_user=1
+        else
+            for u in "${user_map[@]}"; do
+                if [ "$u" == "$client_opt" ]; then target_user="$client_opt"; valid_user=1; break; fi
+            done
+        fi
+        if [ "$valid_user" -eq 0 ]; then echo -e "\n${R}User Not Found\nTry again in 2 second${NC}\n"; sleep 2; continue; else break; fi
+    done
+
+    target_pass="${pass_map[$target_user]}"
+    if [ -z "$target_pass" ] || [ "$target_pass" == " " ]; then target_pass="[Belum Terekam]"; fi
+
+    clear
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e ""
+    echo -e "${PINK}                SSH/Dropbear                 ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}HOST              : $DOMAIN${NC}"
+    echo -e "${G}Username          : $target_user${NC}"
+    echo -e "${G}Password          : $target_pass${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}TLS               : 443,8443${NC}"
+    echo -e "${G}None TLS          : 80,8080${NC}"
+    echo -e "${G}Any               : 2082,2083,8880${NC}"
+    echo -e "${G}OpenSSH           : 444${NC}"
+    echo -e "${G}Dropbear          : 90,109,143${NC}"
+    echo -e "${G}SlowDNS           : 53,5300${NC}"
+    echo -e "${G}UDP-Custom        : 1-65535${NC}"
+    echo -e "${G}OHP + SSH         : 9080${NC}"
+    echo -e "${G}Squid Proxy       : 3128${NC}"
+    echo -e "${G}BadVPN UDPGW      : 7100-7600${NC}"
+    echo -e "${G}OpenVPN TCP       : 80,1194${NC}"
+    echo -e "${G}OpenVPN SSL       : 443${NC}"
+    echo -e "${G}OpenVPN UDP       : 25000${NC}"
+    echo -e "${G}OpenVPN DNS       : 53${NC}"
+    echo -e "${G}OHP + OVPN        : 9088${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${PINK}                   OpenVPN                   ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}http://$DOMAIN:81/myvpn-config.zip${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    raw_date="${exp_map[$target_user]}"
+    if [[ "$raw_date" == *" "* ]]; then raw_date=$(echo "$raw_date" | cut -d' ' -f1); fi
+    echo -e "${O}     Expired  :  $raw_date${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
+}
+
+edit_limit_ip_ssh() {
+    trap 'echo -e "\n"; return' INT
+    while true; do
+        clear
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "${B}===============================================${NC}"
+        printf "${O}  %-14s %-15s %s${NC}\n" "USERNAME" "EXP DATE" "LIMIT IP"
+        echo -e "${B}===============================================${NC}"
+
+        mapfile -t ssh_users < <(sqlite3 "$DB_FILE" "SELECT username, exp_date, ip_limit FROM users WHERE protocol='ssh';")
+        total_acc=${#ssh_users[@]}
+
+        declare -A user_map
+        if [ "$total_acc" -eq 0 ]; then echo -e "${G}            No User Found                    ${NC}"
+        else
+            i=1
+            for user_data in "${ssh_users[@]}"; do
+                username=$(echo "$user_data" | awk -F'|' '{print $1}')
+                exp_date=$(echo "$user_data" | awk -F'|' '{print $2}')
+                limit=$(echo "$user_data" | awk -F'|' '{print $3}')
+                
+                if [[ "$exp_date" == *" "* ]]; then
+                    clean_date=$(echo "$exp_date" | cut -d' ' -f1); formatted_date=$(date -d "$clean_date" +"%d %b,%Y" 2>/dev/null || echo "$exp_date")
+                else formatted_date=$(date -d "$exp_date" +"%d %b,%Y" 2>/dev/null || echo "$exp_date"); fi
+                
+                printf "${G}%2d) %-14s %-15s %s${NC}\n" "$i" "${username:0:14}" "$formatted_date" "$limit"
+                user_map[$i]="$username"
+                ((i++))
+            done
+        fi
+
+        echo -e "${B}===============================================${NC}"
+        if [ "$total_acc" -le 1 ]; then echo -e "${O} Total Account: $total_acc user${NC}"; else echo -e "${O} Total Account: $total_acc users${NC}"; fi
+        echo -e "${B}===============================================${NC}"
+        echo -e "\n${R}Press CTRL+C for CANCEL${NC}\n"
+        if [ "$total_acc" -eq 0 ]; then echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy; return; fi
+
+        if [ "$total_acc" -eq 1 ]; then prompt_range="[1]"; else prompt_range="[1-$total_acc]"; fi
+        echo -ne "${G}Select client $prompt_range or [user]: ${NC}"; read client_opt
+
+        target_user=""
+        valid_user=0
+        if [[ "$client_opt" =~ ^[0-9]+$ ]] && [ "$client_opt" -le "$total_acc" ] && [ "$client_opt" -gt 0 ]; then
+            target_user="${user_map[$client_opt]}"; valid_user=1
+        else
+            for u in "${user_map[@]}"; do
+                if [ "$u" == "$client_opt" ]; then target_user="$client_opt"; valid_user=1; break; fi
+            done
+        fi
+        if [ "$valid_user" -eq 0 ]; then echo -e "\n${R}User Not Found\nTry again in 2 second${NC}\n"; sleep 2; continue; else break; fi
+    done
+
+    clear
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "\n${G} ${C}☞${NC} ${G}$target_user${NC}\n"
+    echo -e "${B}-----------------------------------------------${NC}\n"
+    
+    while true; do echo -ne "${G}Limit (IP) : ${NC}"; read new_limit; if [[ "$new_limit" =~ ^[0-9]+$ ]]; then break; else echo -en "\e[1A\e[K"; fi; done
+
+    sqlite3 "$DB_FILE" "UPDATE users SET ip_limit='$new_limit' WHERE username='$target_user' AND protocol='ssh';"
+
+    echo -e "\n${G}Successfully change Limit $target_user to $new_limit${NC}\n\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
+}
+
+edit_limit_ip_all_ssh() {
+    trap 'echo -e "\n"; return' INT
+    clear
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e ""
+    echo -e "${B}===============================================${NC}"
+    printf "${O}  %-14s %-15s %s${NC}\n" "USERNAME" "EXP DATE" "LIMIT IP"
+    echo -e "${B}===============================================${NC}"
+
+    mapfile -t ssh_users < <(sqlite3 "$DB_FILE" "SELECT username, exp_date, ip_limit FROM users WHERE protocol='ssh';")
+    total_acc=${#ssh_users[@]}
+
+    if [ "$total_acc" -eq 0 ]; then echo -e "${G}             No User Found                   ${NC}"
+    else
+        i=1
+        for user_data in "${ssh_users[@]}"; do
+            username=$(echo "$user_data" | awk -F'|' '{print $1}')
+            exp_date=$(echo "$user_data" | awk -F'|' '{print $2}')
+            limit=$(echo "$user_data" | awk -F'|' '{print $3}')
+            
+            if [[ "$exp_date" == *" "* ]]; then
+                clean_date=$(echo "$exp_date" | cut -d' ' -f1); formatted_date=$(date -d "$clean_date" +"%d %b,%Y" 2>/dev/null || echo "$exp_date")
+            else formatted_date=$(date -d "$exp_date" +"%d %b,%Y" 2>/dev/null || echo "$exp_date"); fi
+            
+            printf "${G}%2d) %-14s %-15s %s${NC}\n" "$i" "${username:0:14}" "$formatted_date" "$limit"
+            ((i++))
+        done
+    fi
+
+    echo -e "${B}===============================================${NC}"
+    if [ "$total_acc" -le 1 ]; then echo -e "${O} Total Account: $total_acc user${NC}"; else echo -e "${O} Total Account: $total_acc users${NC}"; fi
+    echo -e "${B}===============================================${NC}"
+    echo -e "\n${G}Press CTRL+C for CANCEL${NC}\n"
+    if [ "$total_acc" -eq 0 ]; then echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy; return; fi
+
+    while true; do echo -ne "${G}Limit (IP) : ${NC}"; read new_limit; if [[ "$new_limit" =~ ^[0-9]+$ ]]; then break; else echo -en "\e[1A\e[K"; fi; done
+
+    sqlite3 "$DB_FILE" "UPDATE users SET ip_limit='$new_limit' WHERE protocol='ssh';"
+
+    echo -e "\n${G}Successfully change limit ip All Users to $new_limit IP${NC}\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
+}
+
+recovery_ssh() {
+    trap 'echo -e "\n"; return' INT
+    while true; do
+        clear
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "${PINK}                 SSH RECOVERY                  ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "${B}===============================================${NC}"
+        printf "${O}  %-14s %-15s %s${NC}\n" "USERNAME" "EXP DATE" "STATUS"
+        echo -e "${B}===============================================${NC}"
+
+        today_sec=$(date +%s)
+        mapfile -t sys_users < <(awk -F: '$3 >= 1000 && $7 == "/bin/false" {print $1}' /etc/passwd)
+        declare -a orphan_users
+        declare -A user_map
+        declare -A pass_map
+        
+        i=1
+        for u in "${sys_users[@]}"; do
+            db_check=$(sqlite3 "$DB_FILE" "SELECT username FROM users WHERE username='$u' AND protocol='ssh';")
+            if [ -z "$db_check" ]; then
+                if [[ "$u" == trial-* ]]; then continue; fi
+                db_other=$(sqlite3 "$DB_FILE" "SELECT username FROM users WHERE username='$u';")
+                if [ -n "$db_other" ]; then continue; fi
+
+                exp_sys=$(chage -l "$u" 2>/dev/null | grep "Account expires" | cut -d: -f2 | sed 's/^[ \t]*//')
+                exp_sec=$(date -d "$exp_sys" +%s 2>/dev/null)
+                
+                # Hanya masukkan ke recovery jika akun sudah expired
+                if [[ -n "$exp_sec" && "$today_sec" -ge "$exp_sec" ]]; then
+                    formatted_date=$(date -d "$exp_sys" +"%d %b,%Y" 2>/dev/null || echo "$exp_sys")
+                    orphan_users+=("$u")
+                    user_map[$i]="$u"
+                    printf "${G}%2d) %-14s %-15s %s${NC}\n" "$i" "${u:0:14}" "$formatted_date" "RECOVERY"
+                    ((i++))
+                fi
+            fi
+        done
+
+        total_acc=${#orphan_users[@]}
+        if [ "$total_acc" -eq 0 ]; then echo -e "${G}             No User Found                   ${NC}"; fi
+        echo -e "${B}===============================================${NC}"
+        if [ "$total_acc" -le 1 ]; then echo -e "${O} Total Account: $total_acc user${NC}"; else echo -e "${O} Total Account: $total_acc users${NC}"; fi
+        echo -e "${B}===============================================${NC}\n"
+        if [ "$total_acc" -eq 0 ]; then echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy; return; fi
+
+        echo -e "${G}Input type : deleteallusers${NC}"
+        echo -e "${G}             for Delete All Users RECOVERY${NC}\n"
+        echo -e "${B}===============================================${NC}\n"
+        echo -e "${R}Press CTRL+C for CANCEL${NC}\n"
+
+        if [ "$total_acc" -eq 1 ]; then prompt_range="[1]"; else prompt_range="[1-$total_acc]"; fi
+        echo -ne "${G}Select client $prompt_range or [user]: ${NC}"; read client_opt
+
+        if [[ "${client_opt,,}" == "deleteallusers" ]]; then
+            echo -e "\n${G}Deleting all recovery users...${NC}\n"
+            for u in "${orphan_users[@]}"; do
+                sqlite3 "$DB_FILE" "DELETE FROM users WHERE username='$u' AND protocol='ssh';"
+                userdel -f "$u" 2>/dev/null
+                echo -e "${G}Deleted $u${NC}"
+            done
+            echo -e "\n${G}Successfully Deleted All Recovery Users${NC}\n\n${PINK}Press Enter for Back to Manage${NC}"
+            read dummy; continue 
+        fi
+
+        target_user=""
+        valid_user=0
+        if [[ "$client_opt" =~ ^[0-9]+$ ]] && [ "$client_opt" -le "$total_acc" ] && [ "$client_opt" -gt 0 ]; then
+            target_user="${user_map[$client_opt]}"; valid_user=1
+        else
+            for u in "${orphan_users[@]}"; do
+                if [ "$u" == "$client_opt" ]; then target_user="$client_opt"; valid_user=1; break; fi
+            done
+        fi
+        if [ "$valid_user" -eq 0 ]; then echo -e "\n${R}User Not Found\nTry again in 2 second${NC}\n"; sleep 2; continue; else break; fi
+    done
+
+    clear
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "\n${G}You Choose ${O}☞${G} $target_user [RECOVERY]${NC}\n"
+    echo -e "${G}Don't use special characters and uppercase!\n\nJust input a number for-\n Quota Limit\n Limit IP\nFormat GB\n\n${O}0${NC} ${G}for Unlimited\n${O}0${NC} ${G}for No Limit\n\n${R}Press CTRL+C for CANCEL${NC}"
+    echo -e "${B}-----------------------------------------------${NC}\n"
+    
+    while true; do echo -ne "${G}Quota Limit (GB) : ${NC}"; read input_quota; if [[ "$input_quota" =~ ^[0-9]+$ ]]; then break; else echo -en "\e[1A\e[K"; fi; done
+    while true; do echo -ne "${G}Limit (IP)       : ${NC}"; read input_limit; if [[ "$input_limit" =~ ^[0-9]+$ ]]; then break; else echo -en "\e[1A\e[K"; fi; done
+    while true; do echo -ne "${G}Expired (days)   : ${NC}"; read input_exp; if [[ "$input_exp" =~ ^[0-9]+$ ]]; then break; else echo -en "\e[1A\e[K"; fi; done
+
+    old_pass="${pass_map[$target_user]}"
+    if [[ -z "$old_pass" || "$old_pass" == " " ]]; then old_pass=$(tr -dc 'a-z0-9' < /dev/urandom | head -c 8); fi
+    exp=$(date -d "+$input_exp days" +"%Y-%m-%d")
+
+    usermod -e $exp $target_user 2>/dev/null
+    usermod -U $target_user 2>/dev/null
+    echo -e "$target_user:$old_pass" | chpasswd
+    sqlite3 "$DB_FILE" "INSERT INTO users (username, protocol, exp_date, ip_limit, password, quota, status) VALUES ('$target_user', 'ssh', '$exp', '$input_limit', '$old_pass', '$input_quota', 'active');"
+
+    clear
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e ""
+    echo -e "${PINK}                 SSH/Dropbear                  ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}HOST        : $DOMAIN${NC}"
+    echo -e "${G}Username    : $target_user${NC}"
+    echo -e "${G}Password    : $old_pass${NC}"
+    echo -e "${G}Limit IP    : $input_limit${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}TLS         : 443,8443${NC}"
+    echo -e "${G}None TLS    : 80,8080${NC}"
+    echo -e "${G}Any         : 2082,2083,8880${NC}"
+    echo -e "${G}OpenSSH     : 444${NC}"
+    echo -e "${G}Dropbear    : 90,109,143${NC}"
+    echo -e "${G}SlowDNS     : 53,5300${NC}"
+    echo -e "${G}UDP-Custom  : 1-65535${NC}"
+    echo -e "${G}OHP + SSH   : 9080${NC}"
+    echo -e "${G}Squid Proxy : 3128${NC}"
+    echo -e "${G}BadVPN UDP  : 7100-7600${NC}"
+    echo -e "${G}OpenVPN TCP : 80,1194${NC}"
+    echo -e "${G}OpenVPN SSL : 443${NC}"
+    echo -e "${G}OpenVPN UDP : 25000${NC}"
+    echo -e "${G}OpenVPN DNS : 53${NC}"
+    echo -e "${G}OHP + OVPN  : 9088${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${PINK}                   OpenVPN                   ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}http://$DOMAIN:81/myvpn-config.zip${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${O}     Expired  :  $exp${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
+}
+
+while true; do
+    trap 'echo ""; exit 0' INT
+    clear
+    echo -e "${B}---------------------------------------------${NC}"
+    echo -e "            ${G}SSH-Dropbear-OpenVPN             ${NC}"
+    echo -e "${B}---------------------------------------------${NC}"
+    echo -e ""
+    echo -e "  ${G}1.) Create${NC}"
+    echo -e "  ${G}2.) Trial${NC}"
+    echo -e "  ${G}3.) Delete${NC}"
+    echo -e "  ${G}4.) Renew/Extend${NC}"
+    echo -e "  ${G}5.) Modify Password${NC}"
+    echo -e "  ${G}6.) Check Users Login${NC}"
+    echo -e "  ${G}7.) List Users${NC}"
+    echo -e "${B}---------------------------------------------${NC}"
+    echo -e "${BG_BLUE}${G}                LOCK & UNLOCK                ${NC}"
+    echo -e "${B}---------------------------------------------${NC}"
+    echo -e "  ${G}8.) Lock${NC}"
+    echo -e "  ${G}9.) Unlock${NC}"
+    echo -e "${B}---------------------------------------------${NC}"
+    echo -e "${BG_BLUE}${G}                  UTILITIES                  ${NC}"
+    echo -e "${B}---------------------------------------------${NC}"
+    echo -e " ${G}10.) Check Config${NC}"
+    echo -e " ${G}11.) Recovery${NC}"
+    echo -e " ${G}12.) Edit Limit IP${NC}"
+    echo -e " ${G}13.) Edit Limit IP All${NC}"
+    echo -e "${B}---------------------------------------------${NC}"
+    echo -e " ${G}14.) Back to Menu${NC}"
+    echo -e "  ${G}x.) Exit${NC}"
+    echo -e ""
+    echo -e "${B}---------------------------------------------${NC}"
+    echo -e "${B}---------------------------------------------${NC}"
+    echo -e ""
+    echo -ne "${G}Select From Options [1-14 or x] : ${NC}"; read opt
+    case $opt in
+        1) create_ssh ;;
+        2) trial_ssh ;;
+        3) delete_ssh ;;
+        4) renew_ssh ;;
+        5) modify_ssh ;;
+        6) check_login_ssh ;;
+        7) list_ssh ;;
+        8) lock_ssh ;;
+        9) unlock_ssh ;;
+        10) check_config_ssh ;;
+        11) recovery_ssh ;;
+        12) edit_limit_ip_ssh ;;
+        13) edit_limit_ip_all_ssh ;;
+        14) break ;;
+        x|X) clear; exit 0 ;;
+        *) echo -e "\n ${R}Please enter an correct number${NC}"; sleep 1 ;;
+    esac
+done
+EOF
+chmod +x /usr/bin/m-ssh
