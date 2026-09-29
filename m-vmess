@@ -1,0 +1,539 @@
+cat > /usr/bin/m-vmess << 'EOF'
+#!/bin/bash
+
+G="\e[92m"; O="\e[93m"; C="\e[36m"; B="\e[36m"; P="\e[35m"; PINK="\e[95m"; BG_RED="\e[41m"; BG_BLUE="\e[44m"; R="\e[91m"; NC="\e[0m"
+DB_FILE="/etc/vpn/database.db"
+DOMAIN=$(cat /etc/vpn/domain.txt 2>/dev/null)
+CITY=$(curl -s4 http://ip-api.com/line?fields=city || curl -s4 https://ipinfo.io/city || echo "Unknown")
+ISP=$(curl -s4 http://ip-api.com/line?fields=isp || curl -s4 https://ipinfo.io/org | cut -d " " -f 2- || echo "Unknown")
+
+create_vmess() {
+    trap 'echo -e "\n"; return' INT
+    while true; do
+        clear
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "                     ${PINK}VMESS                     ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "${G}Don't use special characters and uppercase!${NC}"
+        echo -e ""
+        echo -e "${G}Just input a number for-${NC}"
+        echo -e "${G} Quota Limit${NC}"
+        echo -e "${G} Limit IP${NC}"
+        echo -e "${G}Format GB${NC}"
+        echo -e ""
+        echo -e "${O}0${NC} ${G}for Unlimited${NC}"
+        echo -e "${O}0${NC} ${G}for No Limit${NC}"
+        echo -e ""
+        echo -e "${G}Press CTRL+C for CANCEL${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        
+        echo -ne "${G}Username         : ${NC}"; read user
+        if [[ -z "$user" ]]; then continue; fi
+        
+        if [[ ${#user} -lt 3 ]] || [[ ${#user} -gt 17 ]]; then
+            echo -e "\n${R}Minimum 3 characters${NC}"
+            echo -e "${R}Maximum 17 characters${NC}"
+            echo -e "${R}Try again in 2 second${NC}\n"
+            sleep 2
+            continue
+        elif [[ ! "$user" =~ ^[a-z0-9]+$ ]]; then
+            echo -e "\n${R}Don't use special characters and uppercase!${NC}"
+            echo -e "\n${R}Try again in 2 seconds${NC}\n"
+            sleep 2
+            continue
+        fi
+
+        db_check=$(sqlite3 "$DB_FILE" "SELECT username FROM users WHERE username='$user' AND protocol='vmess';")
+        if [[ -n "$db_check" ]]; then
+            exist_uuid=$(sqlite3 "$DB_FILE" "SELECT password FROM users WHERE username='$user' AND protocol='vmess';")
+            exist_exp=$(sqlite3 "$DB_FILE" "SELECT exp_date FROM users WHERE username='$user' AND protocol='vmess';")
+            echo -e "\n${G}Username         : ${O}${user}${NC}"
+            echo -e "${G}Uuid             : ${O}${exist_uuid}${NC}"
+            echo -e "${G}Exp              : ${O}${exist_exp}${NC}"
+            echo -e "${G}Status           : ${G}Already Exists${NC}"
+            echo -e "\n${G}Try again in 2 seconds${NC}\n"
+            sleep 2
+            continue
+        else
+            break
+        fi
+    done
+    
+    while true; do echo -ne "${G}Quota Limit (GB) : ${NC}"; read quota; if [[ "$quota" =~ ^[0-9]+$ ]]; then break; else echo -en "\e[1A\e[K"; fi; done
+    while true; do echo -ne "${G}Limit (IP)       : ${NC}"; read iplimit; if [[ "$iplimit" =~ ^[0-9]+$ ]]; then break; else echo -en "\e[1A\e[K"; fi; done
+    while true; do echo -ne "${G}Expired (days)   : ${NC}"; read days; if [[ "$days" =~ ^[0-9]+$ ]]; then break; else echo -en "\e[1A\e[K"; fi; done
+
+    uuid=$(cat /proc/sys/kernel/random/uuid)
+    exp=$(date -d "+$days days" +"%Y-%m-%d")
+
+    sqlite3 "$DB_FILE" "INSERT INTO users (username, protocol, exp_date, ip_limit, password, quota) VALUES ('$user', 'vmess', '$exp', '$iplimit', '$uuid', '$quota');"
+
+    json_tls='{"v":"2","ps":"'$user'","add":"'$DOMAIN'","port":"443","id":"'$uuid'","aid":"0","net":"ws","path":"/vmess","type":"none","host":"'$DOMAIN'","sni":"'$DOMAIN'","tls":"tls"}'
+    vmess_tls="vmess://$(echo -n "$json_tls" | base64 -w 0)"
+    json_ntls='{"v":"2","ps":"'$user'","add":"'$DOMAIN'","port":"80","id":"'$uuid'","aid":"0","net":"ws","path":"/vmess","type":"none","host":"'$DOMAIN'","sni":"'$DOMAIN'","tls":"none"}'
+    vmess_ntls="vmess://$(echo -n "$json_ntls" | base64 -w 0)"
+    json_grpc='{"v":"2","ps":"'$user'","add":"'$DOMAIN'","port":"443","id":"'$uuid'","aid":"0","net":"grpc","path":"vmess","type":"none","host":"'$DOMAIN'","sni":"'$DOMAIN'","tls":"tls"}'
+    vmess_grpc="vmess://$(echo -n "$json_grpc" | base64 -w 0)"
+    json_uptls='{"v":"2","ps":"'$user'","add":"'$DOMAIN'","port":"443","id":"'$uuid'","aid":"0","net":"httpupgrade","path":"/upvmess","type":"none","host":"'$DOMAIN'","sni":"'$DOMAIN'","tls":"tls"}'
+    vmess_uptls="vmess://$(echo -n "$json_uptls" | base64 -w 0)"
+    json_upntls='{"v":"2","ps":"'$user'","add":"'$DOMAIN'","port":"80","id":"'$uuid'","aid":"0","net":"httpupgrade","path":"/upvmess","type":"none","host":"'$DOMAIN'","sni":"'$DOMAIN'","tls":"none"}'
+    vmess_upntls="vmess://$(echo -n "$json_upntls" | base64 -w 0)"
+
+    clear
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e ""
+    echo -e "                 ${PINK}XRAY VMESS                  ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e ""
+    echo -e "${G}VMESS${NC}"
+    echo -e ""
+    echo -e "${G}Remarks      : ${user}${NC}"
+    echo -e "${G}CITY         : ${CITY}${NC}"
+    echo -e "${G}ISP          : ${ISP}${NC}"
+    echo -e "${G}Domain       : ${DOMAIN}${NC}"
+    echo -e "${G}Port TLS     : 443,8443${NC}"
+    echo -e "${G}Port nTLS    : 80,8080${NC}"
+    echo -e "${G}Port Any     : 2052,2053,8880${NC}"
+    echo -e "${G}id           : ${uuid}${NC}"
+    echo -e "${G}alterId      : 0${NC}"
+    echo -e "${G}Security     : auto${NC}"
+    echo -e "${G}network      : ws,grpc,upgrade${NC}"
+    echo -e "${G}path ws      : /vmess - /whatever${NC}"
+    echo -e "${G}serviceName  : vmess${NC}"
+    echo -e "${G}path upgrade : /upvmess${NC}"
+    echo -e ""
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}link TLS     : ${vmess_tls}${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}link none TLS: ${vmess_ntls}${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}link GRPC    : ${vmess_grpc}${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}link Upgrade TLS: ${vmess_uptls}${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}link Upgrade nTLS: ${vmess_upntls}${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "       ${O}Expired  :  ${exp}${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
+}
+
+create_vmess_custom() {
+    trap 'echo -e "\n"; return' INT
+    while true; do
+        clear
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "                    ${PINK}VMESS                    ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "${G}Don't use special characters and uppercase!${NC}"
+        echo -e ""
+        echo -e "${G}Just input a number for-${NC}"
+        echo -e "${G} Quota Limit${NC}"
+        echo -e "${G} Limit IP${NC}"
+        echo -e "${G}Format GB${NC}"
+        echo -e ""
+        echo -e "${O}0${NC} ${G}for Unlimited${NC}"
+        echo -e "${O}0${NC} ${G}for No Limit${NC}"
+        echo -e ""
+        echo -e "${G}Press CTRL+C for CANCEL${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        
+        echo -ne "${G}Username         : ${NC}"; read user
+        if [[ -z "$user" ]]; then continue; fi
+        
+        if [[ ${#user} -lt 3 ]] || [[ ${#user} -gt 17 ]]; then
+            echo -e "\n${R}Minimum 3 characters${NC}"
+            echo -e "${R}Maximum 17 characters${NC}"
+            echo -e "${R}Try again in 2 second${NC}\n"
+            sleep 2
+            continue
+        elif [[ ! "$user" =~ ^[a-z0-9]+$ ]]; then
+            echo -e "\n${R}Don't use special characters and uppercase!${NC}"
+            echo -e "\n${R}Try again in 2 seconds${NC}\n"
+            sleep 2
+            continue
+        fi
+
+        db_check=$(sqlite3 "$DB_FILE" "SELECT username FROM users WHERE username='$user' AND protocol='vmess';")
+        if [[ -n "$db_check" ]]; then
+            exist_uuid=$(sqlite3 "$DB_FILE" "SELECT password FROM users WHERE username='$user' AND protocol='vmess';")
+            exist_exp=$(sqlite3 "$DB_FILE" "SELECT exp_date FROM users WHERE username='$user' AND protocol='vmess';")
+            echo -e "\n${G}Username         : ${O}${user}${NC}"
+            echo -e "${G}Uuid             : ${O}${exist_uuid}${NC}"
+            echo -e "${G}Exp              : ${O}${exist_exp}${NC}"
+            echo -e "${G}Status           : ${G}Already Exists${NC}"
+            echo -e "\n${G}Try again in 2 seconds${NC}\n"
+            sleep 2
+            continue
+        else
+            break
+        fi
+    done
+    
+    while true; do echo -ne "${G}Uuid             : ${NC}"; read custom_uuid; if [ -n "$custom_uuid" ]; then break; else echo -en "\e[1A\e[K"; fi; done
+    while true; do echo -ne "${G}Quota Limit (GB) : ${NC}"; read quota; if [[ "$quota" =~ ^[0-9]+$ ]]; then break; else echo -en "\e[1A\e[K"; fi; done
+    while true; do echo -ne "${G}Limit (IP)       : ${NC}"; read iplimit; if [[ "$iplimit" =~ ^[0-9]+$ ]]; then break; else echo -en "\e[1A\e[K"; fi; done
+    while true; do echo -ne "${G}Expired (days)   : ${NC}"; read days; if [[ "$days" =~ ^[0-9]+$ ]]; then break; else echo -en "\e[1A\e[K"; fi; done
+
+    exp=$(date -d "+$days days" +"%Y-%m-%d")
+
+    sqlite3 "$DB_FILE" "INSERT INTO users (username, protocol, exp_date, ip_limit, password, quota) VALUES ('$user', 'vmess', '$exp', '$iplimit', '$custom_uuid', '$quota');"
+
+    json_tls='{"v":"2","ps":"'$user'","add":"'$DOMAIN'","port":"443","id":"'$custom_uuid'","aid":"0","net":"ws","path":"/vmess","type":"none","host":"'$DOMAIN'","sni":"'$DOMAIN'","tls":"tls"}'
+    vmess_tls="vmess://$(echo -n "$json_tls" | base64 -w 0)"
+    json_ntls='{"v":"2","ps":"'$user'","add":"'$DOMAIN'","port":"80","id":"'$custom_uuid'","aid":"0","net":"ws","path":"/vmess","type":"none","host":"'$DOMAIN'","sni":"'$DOMAIN'","tls":"none"}'
+    vmess_ntls="vmess://$(echo -n "$json_ntls" | base64 -w 0)"
+    json_grpc='{"v":"2","ps":"'$user'","add":"'$DOMAIN'","port":"443","id":"'$custom_uuid'","aid":"0","net":"grpc","path":"vmess","type":"none","host":"'$DOMAIN'","sni":"'$DOMAIN'","tls":"tls"}'
+    vmess_grpc="vmess://$(echo -n "$json_grpc" | base64 -w 0)"
+    json_uptls='{"v":"2","ps":"'$user'","add":"'$DOMAIN'","port":"443","id":"'$custom_uuid'","aid":"0","net":"httpupgrade","path":"/upvmess","type":"none","host":"'$DOMAIN'","sni":"'$DOMAIN'","tls":"tls"}'
+    vmess_uptls="vmess://$(echo -n "$json_uptls" | base64 -w 0)"
+    json_upntls='{"v":"2","ps":"'$user'","add":"'$DOMAIN'","port":"80","id":"'$custom_uuid'","aid":"0","net":"httpupgrade","path":"/upvmess","type":"none","host":"'$DOMAIN'","sni":"'$DOMAIN'","tls":"none"}'
+    vmess_upntls="vmess://$(echo -n "$json_upntls" | base64 -w 0)"
+
+    clear
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e ""
+    echo -e "                 ${PINK}XRAY VMESS                  ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e ""
+    echo -e "${G}VMESS${NC}"
+    echo -e ""
+    echo -e "${G}Remarks      : ${user}${NC}"
+    echo -e "${G}CITY         : ${CITY}${NC}"
+    echo -e "${G}ISP          : ${ISP}${NC}"
+    echo -e "${G}Domain       : ${DOMAIN}${NC}"
+    echo -e "${G}Port TLS     : 443,8443${NC}"
+    echo -e "${G}Port nTLS    : 80,8080${NC}"
+    echo -e "${G}Port Any     : 2052,2053,8880${NC}"
+    echo -e "${G}id           : ${custom_uuid}${NC}"
+    echo -e "${G}alterId      : 0${NC}"
+    echo -e "${G}Security     : auto${NC}"
+    echo -e "${G}network      : ws,grpc,upgrade${NC}"
+    echo -e "${G}path ws      : /vmess - /whatever${NC}"
+    echo -e "${G}serviceName  : vmess${NC}"
+    echo -e "${G}path upgrade : /upvmess${NC}"
+    echo -e ""
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}link TLS     : ${vmess_tls}${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}link none TLS: ${vmess_ntls}${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}link GRPC    : ${vmess_grpc}${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}link Upgrade TLS: ${vmess_uptls}${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}link Upgrade nTLS: ${vmess_upntls}${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${O}     Expired  :  ${exp}${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
+}
+
+trial_vmess() {
+    trap 'echo -e "\n"; return' INT
+    clear
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e ""
+    echo -e "                    ${PINK}VMESS                    ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e ""
+    echo -e "${G}Time Format :${NC}"
+    echo -e ""
+    echo -e "${G}  h - H (Hours)${NC}"
+    echo -e "${G}  m - M (Minutes)${NC}"
+    echo -e ""
+    echo -e "${G}Example : ${O}1h${NC} ${G}for 1 hours${NC}"
+    echo -e ""
+    echo -e "${R}Press CTRL+C for CANCEL${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e ""
+
+    while true; do
+        echo -ne "${G}Trial Time       : ${NC}"; read trial_time
+        unit=$(echo $trial_time | grep -o -i '[a-z]')
+        val=$(echo $trial_time | grep -o '[0-9]*')
+
+        if [[ "${unit,,}" == "h" ]] && [ -n "$val" ]; then
+            exp_display="$val Hour"
+            exp_db=$(date -d "+$val hour" +"%Y-%m-%d %H:%M:%S")
+            break
+        elif [[ "${unit,,}" == "m" ]] && [ -n "$val" ]; then
+            exp_display="$val Minute"
+            exp_db=$(date -d "+$val minute" +"%Y-%m-%d %H:%M:%S")
+            break
+        else
+            echo -en "\e[1A\e[K"
+        fi
+    done
+
+    while true; do echo -ne "${G}Quota Limit (GB) : ${NC}"; read quota; if [[ "$quota" =~ ^[0-9]+$ ]]; then break; else echo -en "\e[1A\e[K"; fi; done
+
+    user="trial-$(tr -dc 'a-z0-9' < /dev/urandom | head -c 5)"
+    uuid=$(cat /proc/sys/kernel/random/uuid)
+    iplimit=1
+
+    sqlite3 "$DB_FILE" "INSERT INTO users (username, protocol, exp_date, ip_limit, password, quota) VALUES ('$user', 'vmess', '$exp_db', '$iplimit', '$uuid', '$quota');"
+
+    json_tls='{"v":"2","ps":"'$user'","add":"'$DOMAIN'","port":"443","id":"'$uuid'","aid":"0","net":"ws","path":"/vmess","type":"none","host":"'$DOMAIN'","sni":"'$DOMAIN'","tls":"tls"}'
+    vmess_tls="vmess://$(echo -n "$json_tls" | base64 -w 0)"
+    json_ntls='{"v":"2","ps":"'$user'","add":"'$DOMAIN'","port":"80","id":"'$uuid'","aid":"0","net":"ws","path":"/vmess","type":"none","host":"'$DOMAIN'","sni":"'$DOMAIN'","tls":"none"}'
+    vmess_ntls="vmess://$(echo -n "$json_ntls" | base64 -w 0)"
+    json_grpc='{"v":"2","ps":"'$user'","add":"'$DOMAIN'","port":"443","id":"'$uuid'","aid":"0","net":"grpc","path":"vmess","type":"none","host":"'$DOMAIN'","sni":"'$DOMAIN'","tls":"tls"}'
+    vmess_grpc="vmess://$(echo -n "$json_grpc" | base64 -w 0)"
+    json_uptls='{"v":"2","ps":"'$user'","add":"'$DOMAIN'","port":"443","id":"'$uuid'","aid":"0","net":"httpupgrade","path":"/upvmess","type":"none","host":"'$DOMAIN'","sni":"'$DOMAIN'","tls":"tls"}'
+    vmess_uptls="vmess://$(echo -n "$json_uptls" | base64 -w 0)"
+    json_upntls='{"v":"2","ps":"'$user'","add":"'$DOMAIN'","port":"80","id":"'$uuid'","aid":"0","net":"httpupgrade","path":"/upvmess","type":"none","host":"'$DOMAIN'","sni":"'$DOMAIN'","tls":"none"}'
+    vmess_upntls="vmess://$(echo -n "$json_upntls" | base64 -w 0)"
+
+    clear
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e ""
+    echo -e "                 ${PINK}XRAY VMESS                  ${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e ""
+    echo -e "${G}VMESS${NC}"
+    echo -e ""
+    echo -e "${G}Remarks      : ${user}${NC}"
+    echo -e "${G}CITY         : ${CITY}${NC}"
+    echo -e "${G}ISP          : ${ISP}${NC}"
+    echo -e "${G}Domain       : ${DOMAIN}${NC}"
+    echo -e "${G}Port TLS     : 443,8443${NC}"
+    echo -e "${G}Port nTLS    : 80,8080${NC}"
+    echo -e "${G}Port Any     : 2052,2053,8880${NC}"
+    echo -e "${G}id           : ${uuid}${NC}"
+    echo -e "${G}alterId      : 0${NC}"
+    echo -e "${G}Security     : auto${NC}"
+    echo -e "${G}network      : ws,grpc,upgrade${NC}"
+    echo -e "${G}path ws      : /vmess - /whatever${NC}"
+    echo -e "${G}serviceName  : vmess${NC}"
+    echo -e "${G}path upgrade : /upvmess${NC}"
+    echo -e ""
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}link TLS     : ${vmess_tls}${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}link none TLS: ${vmess_ntls}${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}link GRPC    : ${vmess_grpc}${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}link Upgrade TLS: ${vmess_uptls}${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${G}link Upgrade nTLS: ${vmess_upntls}${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "${O}     Expired  :  ${exp_display}${NC}"
+    echo -e "${B}-----------------------------------------------${NC}"
+    echo -e "\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
+}
+
+delete_vmess() {
+    trap 'echo -e "\n"; return' INT
+    while true; do
+        clear
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "                    ${PINK}VMESS                    ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "${B}===============================================${NC}"
+        printf "${O}  %-14s %-15s %s${NC}\n" "USERNAME" "EXP DATE" "STATUS"
+        echo -e "${B}===============================================${NC}"
+
+        mapfile -t vmess_users < <(sqlite3 "$DB_FILE" "SELECT username, exp_date, status FROM users WHERE protocol='vmess';")
+        total_acc=${#vmess_users[@]}
+
+        declare -A user_map
+        declare -A exp_map
+        if [ "$total_acc" -eq 0 ]; then echo -e "${G}              No User Found                    ${NC}"
+        else
+            i=1
+            for user_data in "${vmess_users[@]}"; do
+                username=$(echo "$user_data" | awk -F'|' '{print $1}')
+                exp_date=$(echo "$user_data" | awk -F'|' '{print $2}')
+                status_db=$(echo "$user_data" | awk -F'|' '{print $3}')
+                
+                if [[ "$exp_date" == *" "* ]]; then
+                    clean_date=$(echo "$exp_date" | cut -d' ' -f1); formatted_date=$(date -d "$clean_date" +"%d %b,%Y" 2>/dev/null || echo "$exp_date")
+                else formatted_date=$(date -d "$exp_date" +"%d %b,%Y" 2>/dev/null || echo "$exp_date"); fi
+                
+                status_show="UNLOCKED"
+                if [ "$status_db" == "locked" ]; then status_show="LOCKED"; fi
+                printf "${G}%2d) %-14s %-15s %s${NC}\n" "$i" "${username:0:14}" "$formatted_date" "$status_show"
+                user_map[$i]="$username"
+                exp_map["$username"]="$exp_date"
+                ((i++))
+            done
+        fi
+
+        echo -e "${B}===============================================${NC}"
+        if [ "$total_acc" -le 1 ]; then echo -e "${O} Total Account: $total_acc user${NC}"; else echo -e "${O} Total Account: $total_acc users${NC}"; fi
+        echo -e "${B}===============================================${NC}"
+        echo -e "\n${G}Press CTRL+C for CANCEL${NC}\n"
+        
+        if [ "$total_acc" -eq 0 ]; then echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy; return; fi
+
+        if [ "$total_acc" -eq 1 ]; then prompt_range="[1]"; else prompt_range="[1-$total_acc]"; fi
+        echo -ne "${G}Select client $prompt_range or [user]: ${NC}"; read client_opt
+
+        target_user=""
+        valid_user=0
+        if [[ "$client_opt" =~ ^[0-9]+$ ]] && [ "$client_opt" -le "$total_acc" ] && [ "$client_opt" -gt 0 ]; then
+            target_user="${user_map[$client_opt]}"
+            del_exp="${exp_map[$target_user]}"
+            valid_user=1
+        else
+            for i in "${!user_map[@]}"; do
+                if [ "${user_map[$i]}" == "$client_opt" ]; then target_user="$client_opt"; del_exp="${exp_map[$target_user]}"; valid_user=1; break; fi
+            done
+        fi
+        if [ "$valid_user" -eq 0 ]; then echo -e "\n${R}User Not Found\nTry again in 2 second${NC}\n"; sleep 2; continue; else break; fi
+    done
+
+    echo -e "\n${G}You Choose ${C}☞${NC} ${G}$target_user [delete]${NC}\n"
+    echo -ne "${G}Correct (y) ? ${NC}"; read confirm
+
+    if [[ "${confirm,,}" == "y" ]]; then
+        sqlite3 "$DB_FILE" "DELETE FROM users WHERE username='$target_user' AND protocol='vmess';"
+        
+        if [[ "$del_exp" == *" "* ]]; then
+            clean_date=$(echo "$del_exp" | cut -d' ' -f1); del_exp_formatted=$(date -d "$clean_date" +"%Y-%m-%d" 2>/dev/null || echo "$del_exp")
+        else del_exp_formatted=$(date -d "$del_exp" +"%Y-%m-%d" 2>/dev/null || echo "$del_exp"); fi
+
+        clear
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "         ${C}Account Deleted Successfully          ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "${G}Client Name : ${O}$target_user${NC}"
+        echo -e "${G}Expired On  : ${O}$del_exp_formatted${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
+    else
+        echo -e "\n${R}Canceled.\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
+    fi
+}
+
+renew_vmess() {
+    trap 'echo -e "\n"; return' INT
+    while true; do
+        clear
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e "${BG_RED}${G}                 LBJ TUNNELING                 ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "                    ${PINK}VMESS                    ${NC}"
+        echo -e "${B}-----------------------------------------------${NC}"
+        echo -e ""
+        echo -e "${B}===============================================${NC}"
+        printf "${O}  %-14s %-15s %s${NC}\n" "USERNAME" "EXP DATE" "STATUS"
+        echo -e "${B}===============================================${NC}"
+
+        mapfile -t vmess_users < <(sqlite3 "$DB_FILE" "SELECT username, exp_date, status, quota FROM users WHERE protocol='vmess';")
+        total_acc=${#vmess_users[@]}
+
+        declare -A user_map
+        declare -A exp_map
+        declare -A quota_map
+        if [ "$total_acc" -eq 0 ]; then echo -e "${G}              No User Found                    ${NC}"
+        else
+            i=1
+            for user_data in "${vmess_users[@]}"; do
+                username=$(echo "$user_data" | awk -F'|' '{print $1}')
+                exp_date=$(echo "$user_data" | awk -F'|' '{print $2}')
+                status_db=$(echo "$user_data" | awk -F'|' '{print $3}')
+                quota_db=$(echo "$user_data" | awk -F'|' '{print $4}')
+                
+                # Filter aktif untuk Renew
+                exp_sec=$(date -d "$exp_date" +%s 2>/dev/null)
+                today_sec=$(date +%s)
+                if [[ -n "$exp_sec" && "$today_sec" -ge "$exp_sec" ]]; then continue; fi
+
+                if [[ "$exp_date" == *" "* ]]; then
+                    clean_date=$(echo "$exp_date" | cut -d' ' -f1); formatted_date=$(date -d "$clean_date" +"%d %b,%Y" 2>/dev/null || echo "$exp_date")
+                else formatted_date=$(date -d "$exp_date" +"%d %b,%Y" 2>/dev/null || echo "$exp_date"); fi
+                
+                status_show="UNLOCKED"
+                if [ "$status_db" == "locked" ]; then status_show="LOCKED"; fi
+                printf "${G}%2d) %-14s %-15s %s${NC}\n" "$i" "${username:0:14}" "$formatted_date" "$status_show"
+                user_map[$i]="$username"
+                exp_map["$username"]="$exp_date"
+                quota_map["$username"]="$quota_db"
+                ((i++))
+            done
+        fi
+
+        echo -e "${B}===============================================${NC}"
+        if [ "$total_acc" -le 1 ]; then echo -e "${O} Total Account: $total_acc user${NC}"; else echo -e "${O} Total Account: $total_acc users${NC}"; fi
+        echo -e "${B}===============================================${NC}"
+        echo -e "\n${G}Press CTRL+C for CANCEL${NC}\n"
+        if [ "$total_acc" -eq 0 ]; then echo -e "${PINK}Press Enter for Back to Manage${NC}"; read dummy; return; fi
+
+        if [ "$total_acc" -eq 1 ]; then prompt_range="[1]"; else prompt_range="[1-$total_acc]"; fi
+        echo -ne "${G}Select client $prompt_range or [user]: ${NC}"; read client_opt
+
+        target_user=""
+        valid_user=0
+        if [[ "$client_opt" =~ ^[0-9]+$ ]] && [ "$client_opt" -le "$total_acc" ] && [ "$client_opt" -gt 0 ]; then
+            target_user="${user_map[$client_opt]}"; valid_user=1
+        else
+            for i in "${!user_map[@]}"; do
+                if [ "${user_map[$i]}" == "$client_opt" ]; then target_user="$client_opt"; valid_user=1; break; fi
+            done
+        fi
+        if [ "$valid_user" -eq 0 ]; then echo -e "\n${R}User Not Found\nTry again in 2 second${NC}\n"; sleep 2; continue; else break; fi
+    done
+
+    echo -e "\n${G}You Choose ${C}☞${NC} ${G}$target_user [renew]${NC}\n"
+    while true; do echo -ne "${G}Day   Extend     :  ${NC}"; read ext_days; if [[ "$ext_days" =~ ^[0-9]+$ ]]; then break; else echo -en "\e[1A\e[K"; fi; done
+    while true; do echo -ne "${G}Quota Extend     :  ${NC}"; read quota_ext; if [[ "$quota_ext" =~ ^[0-9]+$ ]]; then break; else echo -en "\e[1A\e[K"; fi; done
+    while true; do echo -ne "${G}Reset Quota (y/n):  ${NC}"; read rst_quota; if [[ "${rst_quota,,}" == "y" || "${rst_quota,,}" == "n" ]]; then break; else echo -en "\e[1A\e[K"; fi; done
+
+    old_exp="${exp_map[$target_user]}" 
+    if [[ "$old_exp" == *" "* ]]; then old_exp=$(echo "$old_exp" | cut -d' ' -f1); fi
+
+    old_exp_sec=$(date -d "$old_exp" +%s 2>/dev/null)
+    today_sec=$(date +%s)
+    if [[ -n "$old_exp_sec" && "$old_exp_sec" -gt "$today_sec" ]]; then
+        new_exp=$(date -d "$old_exp + $ext_days days" +"%Y-%m-%d")
+    else new_exp=$(date -d "+$ext_days days" +"%Y-%m-%d"); fi
+    display_exp=$(date -d "$new_exp" +"%d %b, %Y")
+
+    old_quota="${quota_map[$target_user]}"
+    if [ -z "$old_quota" ]; then old_quota=0; fi
+    new_quota=$((old_quota + quota_ext))
+
+    sqlite3 "$DB_FILE" "UPDATE users SET exp_date='$new_exp', quota='$new_quota' WHERE username='$target_user' AND protocol='vmess';"
+
+    echo -e "\n${B}===============================================${NC}\n"
+    echo -e "${G}Username         :  $target_user${NC}"
+    echo -e "${G}Quota            :  ${new_quota}.0GB${NC}"
+    echo -e "${G}Days Added until :  $ext_days Days${NC}"
+    echo -e "${G}Expires on       :  $display_exp${NC}"
+    echo -e "\n${B}===============================================${NC}\n\n${PINK}Press Enter for Back to Manage${NC}"; read dummy
+}
+EOF
