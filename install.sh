@@ -20,12 +20,12 @@ echo -e "\n${O}Domain Anda: ${domain_input}${NC}"
 echo -e "${G}Memulai Instalasi Sistem... Jangan tutup terminal!${NC}\n"; sleep 2
 
 # 2. UPDATE OS & INSTALL DEPENDENCIES
-echo -e "${C}[1/9] Menginstal Dependensi Sistem...${NC}"
+echo -e "${C}[1/10] Menginstal Dependensi Sistem...${NC}"
 apt-get update -y && apt-get upgrade -y
 apt-get install -y bzip2 gzip coreutils curl unzip wget socat bc jq chrony sqlite3 vnstat iptables iptables-persistent net-tools nginx certbot ufw dropbear stunnel4 python3
 
 # 3. SETUP DIREKTORI & DOMAIN
-echo -e "${C}[2/9] Menyiapkan Direktori & File...${NC}"
+echo -e "${C}[2/10] Menyiapkan Direktori & File...${NC}"
 mkdir -p /etc/vpn
 mkdir -p /etc/xray
 mkdir -p /var/log/xray
@@ -37,7 +37,7 @@ date -d "+360 days" +"%Y-%m-%d" > /etc/vpn/exp.txt
 timedatectl set-timezone Asia/Jakarta
 
 # 4. GENERATE SSL (ACME.SH)
-echo -e "${C}[3/9] Menerbitkan Sertifikat SSL...${NC}"
+echo -e "${C}[3/10] Menerbitkan Sertifikat SSL...${NC}"
 systemctl stop nginx
 curl -sL https://get.acme.sh | sh -s email=admin@${domain_input}
 /root/.acme.sh/acme.sh --server letsencrypt --register-account -m admin@${domain_input}
@@ -46,20 +46,18 @@ curl -sL https://get.acme.sh | sh -s email=admin@${domain_input}
 chmod 644 /etc/xray/xray.crt && chmod 644 /etc/xray/xray.key
 
 # 5. INSTALL XRAY CORE
-echo -e "${C}[4/9] Menginstal Xray Core...${NC}"
+echo -e "${C}[4/10] Menginstal Xray Core...${NC}"
 bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
 chown -R root:root /etc/xray && chmod 755 /etc/xray
 
 # 6. SETUP SSH (DROPBEAR, STUNNEL, WEBSOCKET)
-echo -e "${C}[5/9] Memasang Dropbear, Stunnel & WebSocket...${NC}"
-# Dropbear (Port 109, 143)
+echo -e "${C}[5/10] Memasang Dropbear, Stunnel & WebSocket...${NC}"
 sed -i 's/NO_START=1/NO_START=0/g' /etc/default/dropbear
 sed -i 's/DROPBEAR_PORT=22/DROPBEAR_PORT=109/g' /etc/default/dropbear
 sed -i 's/DROPBEAR_EXTRA_ARGS=.*/DROPBEAR_EXTRA_ARGS="-p 143"/g' /etc/default/dropbear
 echo "/bin/false" >> /etc/shells
 systemctl restart dropbear && systemctl enable dropbear
 
-# Stunnel4 (Port 8443)
 cat > /etc/stunnel/stunnel.conf << END
 cert = /etc/xray/xray.crt
 key = /etc/xray/xray.key
@@ -75,7 +73,6 @@ END
 sed -i 's/ENABLED=0/ENABLED=1/g' /etc/default/stunnel4
 systemctl restart stunnel4 && systemctl enable stunnel4
 
-# Python WebSocket (Port 8080)
 cat > /usr/local/bin/ws-dropbear << 'END'
 #!/usr/bin/python3
 import socket, threading, select
@@ -138,12 +135,12 @@ END
 systemctl daemon-reload && systemctl enable ws-dropbear && systemctl start ws-dropbear
 
 # 7. SETUP DATABASE SQLITE3
-echo -e "${C}[6/9] Membangun Database SQLite...${NC}"
+echo -e "${C}[6/10] Membangun Database SQLite...${NC}"
 DB_FILE="/etc/vpn/database.db"
 sqlite3 "$DB_FILE" "CREATE TABLE IF NOT EXISTS users (username TEXT, protocol TEXT, exp_date TEXT, ip_limit INTEGER DEFAULT 0, password TEXT, quota INTEGER DEFAULT 0, status TEXT DEFAULT 'active');"
 
 # 8. MENGUNDUH FILE DARI GITHUB
-echo -e "${C}[7/9] Mengunduh Modul & Menu LBJ...${NC}"
+echo -e "${C}[7/10] Mengunduh Modul & Menu LBJ...${NC}"
 
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 # !!! GANTI BARIS DI BAWAH INI SESUAI REPOSITORY GITHUB ANDA !!!
@@ -157,7 +154,7 @@ wget -O m-vmess "${REPO_URL}/m-vmess" && chmod +x m-vmess
 wget -O m-vless "${REPO_URL}/m-vless" && chmod +x m-vless
 wget -O m-trojan "${REPO_URL}/m-trojan" && chmod +x m-trojan
 
-echo -e "${C}[8/9] Menerapkan Konfigurasi Xray & Nginx...${NC}"
+echo -e "${C}[8/10] Menerapkan Konfigurasi Xray & Nginx...${NC}"
 wget -O /etc/xray/config.json "${REPO_URL}/config.json"
 wget -O /etc/nginx/conf.d/xray.conf "${REPO_URL}/xray.conf"
 
@@ -166,9 +163,16 @@ rm -f /etc/nginx/sites-enabled/default
 rm -f /etc/nginx/sites-available/default
 
 # 9. RESTART SERVICES
-echo -e "${C}[9/9] Konfigurasi Akhir & Restart Service...${NC}"
+echo -e "${C}[9/10] Konfigurasi Akhir & Restart Service...${NC}"
 systemctl enable xray && systemctl restart xray
 systemctl enable nginx && systemctl restart nginx
+
+# 10. SETUP AUTO-MENU & REBOOT
+echo -e "${C}[10/10] Menyiapkan Auto-Start Menu & Reboot...${NC}"
+if ! grep -q "menu" /root/.profile; then
+    echo 'clear' >> /root/.profile
+    echo 'menu' >> /root/.profile
+fi
 
 clear
 echo -e "${C}===============================================${NC}"
@@ -177,5 +181,8 @@ echo -e "${C}===============================================${NC}"
 echo -e "Domain     : ${O}${domain_input}${NC}"
 echo -e "Sertifikat : ${G}Sukses Terbit (ECC)${NC}"
 echo -e "${C}===============================================${NC}"
-echo -e "Ketik ${G}menu${NC} di terminal untuk masuk ke panel manajemen."
+echo -e "${O}VPS akan otomatis direboot dalam 5 detik...${NC}"
+echo -e "${C}===============================================${NC}"
 rm -f /root/install.sh
+sleep 5
+reboot
