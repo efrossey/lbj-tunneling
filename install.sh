@@ -6,46 +6,47 @@ R="\e[91m"
 C="\e[36m"
 NC="\e[0m"
 
-echo -e "${C}===============================================${NC}"
-echo -e "${G}     INSTALLING DEPENDENCIES (MOHON TUNGGU)    ${NC}"
-echo -e "${C}===============================================${NC}"
-# Update OS dan Install SQLite3 & vnstat (Wajib di VPS Fresh)
-apt-get update -y
-apt-get install -y sqlite3 wget curl vnstat
-
-# Membuat direktori sistem dasar
-mkdir -p /etc/vpn
-
+# 1. Bersihkan layar dan minta input domain terlebih dahulu
 clear
 echo -e "${C}===============================================${NC}"
 echo -e "${G}         SETUP DOMAIN LBJ TUNNELING            ${NC}"
 echo -e "${C}===============================================${NC}"
 echo -e ""
-
-# Minta input domain (Kini pasti berhenti untuk minta ketikan Anda)
 read -p "Masukkan Domain Anda (contoh: vpn.domain.com): " domain_input
 
-# Menyimpan domain ke file
+echo -e "\n${G}Domain berhasil disimpan: ${domain_input}${NC}\n"
+
+# 2. Proses Install Paket Wajib (Sekarang prosesnya akan terlihat di layar)
+echo -e "${C}===============================================${NC}"
+echo -e "${G}     INSTALLING DEPENDENCIES (MOHON TUNGGU)    ${NC}"
+echo -e "${C}===============================================${NC}"
+apt-get update -y
+apt-get install -y sqlite3 wget curl vnstat
+
+# 3. Buat folder dan simpan domain
+mkdir -p /etc/vpn
 echo "$domain_input" > /etc/vpn/domain.txt
 
-echo -e "\n${G}Domain berhasil disimpan: ${domain_input}${NC}\n"
-echo -e "Memulai download modul skrip LBJ Tunneling..."
+# 4. Download modul dari GitHub
+echo -e "\n${C}===============================================${NC}"
+echo -e "${G}      MENDOWNLOAD MODUL DARI GITHUB...         ${NC}"
+echo -e "${C}===============================================${NC}"
 
-# URL RAW dari GitHub Anda (Wajib diganti sesuai repo Anda)
+# PASTIKAN MENGGANTI URL DI BAWAH INI DENGAN REPO ANDA
 REPO_URL="https://raw.githubusercontent.com/efrossey/lbj-tunneling/refs/heads/main"
 
-# Proses Download & Pemasangan Izin Eksekusi
 cd /usr/bin
-wget -qO menu "${REPO_URL}/menu" && chmod +x menu
-wget -qO m-ssh "${REPO_URL}/m-ssh" && chmod +x m-ssh
-wget -qO m-vmess "${REPO_URL}/m-vmess" && chmod +x m-vmess
+# Menghilangkan -q agar progres download terlihat
+wget -O menu "${REPO_URL}/menu" && chmod +x menu
+wget -O m-ssh "${REPO_URL}/m-ssh" && chmod +x m-ssh
+wget -O m-vmess "${REPO_URL}/m-vmess" && chmod +x m-vmess
 
-# Membuat struktur database pertama kali
+# 5. Setup Database
+echo -e "\n${G}Menyiapkan Database...${NC}"
 if [ ! -f /etc/vpn/database.db ]; then
     sqlite3 /etc/vpn/database.db "CREATE TABLE IF NOT EXISTS users (username TEXT, protocol TEXT, exp_date TEXT, ip_limit INTEGER DEFAULT 0, password TEXT, quota INTEGER DEFAULT 0, status TEXT DEFAULT 'active');"
 fi
 
-# Membuat file default client name
 if [ ! -f /etc/vpn/client.txt ]; then 
     echo "LBJ-Server" > /etc/vpn/client.txt
 fi
