@@ -1,15 +1,10 @@
-cat > /usr/bin/menu << 'EOF'
 #!/bin/bash
 
-# ==========================================
-# VARIABEL WARNA (ANSI CODES)
-# ==========================================
 G="\e[92m"; O="\e[93m"; C="\e[36m"; B="\e[36m"; P="\e[35m"; PINK="\e[95m"; BG_RED="\e[41m"; R="\e[91m"; NC="\e[0m"
 
 XRAY_CONF="/usr/local/etc/xray/config.json"
 DB_FILE="/etc/vpn/database.db"
 
-# Pastikan folder dan file dinamis tersedia
 mkdir -p /etc/vpn
 if [ ! -f /etc/vpn/client.txt ]; then echo "LBJ-Server" > /etc/vpn/client.txt; fi
 if [ ! -f /etc/vpn/exp.txt ]; then date -d "+360 days" +"%Y-%m-%d" > /etc/vpn/exp.txt; fi
@@ -18,10 +13,11 @@ DOMAIN=$(cat /etc/vpn/domain.txt 2>/dev/null)
 CLIENT_NAME=$(cat /etc/vpn/client.txt 2>/dev/null)
 SCRIPT_EXP=$(cat /etc/vpn/exp.txt 2>/dev/null)
 
-# Setup Database Pertama Kali
 sqlite3 "$DB_FILE" "CREATE TABLE IF NOT EXISTS users (username TEXT, protocol TEXT, exp_date TEXT, ip_limit INTEGER DEFAULT 0, password TEXT, quota INTEGER DEFAULT 0, status TEXT DEFAULT 'active');" 2>/dev/null
+sqlite3 "$DB_FILE" "ALTER TABLE users ADD COLUMN password TEXT;" 2>/dev/null
+sqlite3 "$DB_FILE" "ALTER TABLE users ADD COLUMN ip_limit INTEGER DEFAULT 0;" 2>/dev/null
+sqlite3 "$DB_FILE" "ALTER TABLE users ADD COLUMN quota INTEGER DEFAULT 0;" 2>/dev/null
 
-# Kalkulasi Sisa Hari Skrip
 current_date=$(date +%s)
 exp_date=$(date -d "$SCRIPT_EXP" +%s 2>/dev/null)
 if [ -n "$exp_date" ]; then
@@ -31,7 +27,6 @@ else
     sisa_hari=360
 fi
 
-# Sistem Deteksi Service Dinamis
 sx_val=$(systemctl is-active --quiet xray && echo "ON" || echo "OFF")
 sw_val=$(systemctl is-active --quiet ws-stunnel || systemctl is-active --quiet ws-dropbear || systemctl is-active --quiet dropbear || systemctl is-active --quiet ssh && echo "ON" || echo "OFF")
 sb_val=$(systemctl is-active --quiet nginx || systemctl is-active --quiet haproxy && echo "ON" || echo "OFF")
@@ -52,9 +47,6 @@ UPTIME=$(uptime -p | sed 's/up //')
 MONTH=$(date +%B)
 DAY=$(date +%A)
 
-# ==========================================
-# TRAFFIC REAL-TIME ENGINE
-# ==========================================
 IFACE=$(ip -o -4 route show to default | awk '{print $5}' | head -n 1)
 if [[ -n "$IFACE" ]]; then
     VSTAT=$(vnstat -i $IFACE --oneline 2>/dev/null)
@@ -77,9 +69,6 @@ DAY_RX=${DAY_RX:-"0MiB"}; DAY_TX=${DAY_TX:-"0MiB"}; DAY_TOT=${DAY_TOT:-"0MiB"}
 MON_RX=${MON_RX:-"0MiB"}; MON_TX=${MON_TX:-"0MiB"}; MON_TOT=${MON_TOT:-"0MiB"}
 TRAFFIC=${TRAFFIC:-"0.00 kbit/s"}
 
-# ==========================================
-# BACKEND PROCESS (AUTO CLEANUP & AUTO LOCK)
-# ==========================================
 auto_cleanup() {
     local current_time=$(date +"%Y-%m-%d %H:%M:%S")
     mapfile -t expired_ssh < <(sqlite3 "$DB_FILE" "SELECT username FROM users WHERE protocol='ssh' AND username LIKE 'trial-%' AND exp_date <= '$current_time';")
@@ -95,8 +84,7 @@ auto_lock_users() {
     if [ -n "$active_ssh_pids" ]; then active_ssh_users=$(echo "$active_ssh_pids" | xargs -I {} ps -o user= -p {} 2>/dev/null | awk '{print $1}'); fi
     mapfile -t ssh_users < <(sqlite3 "$DB_FILE" "SELECT username, ip_limit FROM users WHERE protocol='ssh' AND status!='locked';")
     for user_data in "${ssh_users[@]}"; do
-        local u=$(echo "$user_data" | cut -d'|' -f1)
-        local lim=$(echo "$user_data" | cut -d'|' -f2)
+        local u=$(echo "$user_data" | cut -d'|' -f1); local lim=$(echo "$user_data" | cut -d'|' -f2)
         if [[ -n "$lim" && "$lim" -gt 0 ]]; then
             local ip_count=$(echo "$active_ssh_users" | grep -w "$u" | wc -l)
             if [[ "$ip_count" -gt "$lim" ]]; then
@@ -110,24 +98,16 @@ auto_lock_users() {
         local xray_stats=$(xray api statsquery --server=127.0.0.1:10085 2>/dev/null)
         mapfile -t vmess_users < <(sqlite3 "$DB_FILE" "SELECT username, ip_limit, quota FROM users WHERE protocol='vmess' AND status!='locked';")
         for user_data in "${vmess_users[@]}"; do
-            local u=$(echo "$user_data" | cut -d'|' -f1)
-            local lim=$(echo "$user_data" | cut -d'|' -f2)
-            local qta=$(echo "$user_data" | cut -d'|' -f3)
-            
+            local u=$(echo "$user_data" | cut -d'|' -f1); local lim=$(echo "$user_data" | cut -d'|' -f2); local qta=$(echo "$user_data" | cut -d'|' -f3)
             if [[ -n "$lim" && "$lim" -gt 0 ]]; then
                 local ip_count=$(grep "accepted" /var/log/xray/access.log 2>/dev/null | grep -w "email: $u" | awk '{print $3}' | cut -d':' -f1 | sort -u | wc -l)
-                if [[ "$ip_count" -gt "$lim" ]]; then
-                    sqlite3 "$DB_FILE" "UPDATE users SET status='locked' WHERE username='$u' AND protocol='vmess'"; continue
-                fi
+                if [[ "$ip_count" -gt "$lim" ]]; then sqlite3 "$DB_FILE" "UPDATE users SET status='locked' WHERE username='$u' AND protocol='vmess'"; continue; fi
             fi
-
             if [[ -n "$qta" && "$qta" -gt 0 ]]; then
                 local traffic_bytes=$(echo "$xray_stats" | grep -A 1 "user>>>${u}>>>traffic>>>downlink" | grep "value" | awk '{print $2}' | tr -d '"')
                 if [[ -n "$traffic_bytes" && "$traffic_bytes" -gt 0 ]]; then
                     local traffic_gb=$(( traffic_bytes / 1073741824 ))
-                    if [[ "$traffic_gb" -ge "$qta" ]]; then
-                        sqlite3 "$DB_FILE" "UPDATE users SET status='locked' WHERE username='$u' AND protocol='vmess'"
-                    fi
+                    if [[ "$traffic_gb" -ge "$qta" ]]; then sqlite3 "$DB_FILE" "UPDATE users SET status='locked' WHERE username='$u' AND protocol='vmess'"; fi
                 fi
             fi
         done
@@ -144,61 +124,59 @@ print_line() {
     echo -e "${C}│${NC}${G} ${lbl_pad} : ${NC}${val_fmt}${spaces}${NC}${C}│${NC}"
 }
 
-# EKSEKUSI BACKGROUND (Agar menu loading cepat)
-auto_cleanup >/dev/null 2>&1 &
-auto_lock_users >/dev/null 2>&1 &
+while true; do
+    auto_cleanup >/dev/null 2>&1 &
+    auto_lock_users >/dev/null 2>&1 &
+    
+    clear
+    echo -e "${C}┌───────────────────────────────────────────────┐${NC}"
+    echo -e "${C}│${BG_RED}${G}                 LBJ TUNNELING                 ${NC}${C}│${NC}"
+    echo -e "${C}└───────────────────────────────────────────────┘${NC}"
+    echo -e "${C}┌───────────────────────────────────────────────┐${NC}"
+    print_line "OS" "${OS:0:36}" "${G}${OS:0:36}"
+    print_line "RAM" "${RAM:0:36}" "${G}${RAM:0:36}"
+    print_line "SWAP" "${SWAP:0:36}" "${G}${SWAP:0:36}"
+    print_line "CITY" "${CITY:0:36}" "${G}${CITY:0:36}"
+    print_line "ISP" "${ISP:0:36}" "${G}${ISP:0:36}"
+    print_line "IP" "${IP:0:36}" "${PINK}${IP:0:36}"
+    print_line "DOMAIN" "${DOMAIN:0:36}" "${G}${DOMAIN:0:36}"
+    print_line "UPTIME" "${UPTIME:0:36}" "${G}${UPTIME:0:36}"
+    echo -e "${C}│${P}-----------------------------------------------${NC}${C}│${NC}"
+    print_line "MONTH" "${MON_TOT}  [${MONTH}]" "${G}${MON_TOT}  ${C}[${MONTH}]"
+    print_line "RX" "${MON_RX}" "${G}${MON_RX}"
+    print_line "TX" "${MON_TX}" "${G}${MON_TX}"
+    echo -e "${C}│${P}-----------------------------------------------${NC}${C}│${NC}"
+    print_line "DAY" "${DAY_TOT}  [${DAY}]" "${G}${DAY_TOT}  ${C}[${DAY}]"
+    print_line "RX" "${DAY_RX}" "${G}${DAY_RX}"
+    print_line "TX" "${DAY_TX}" "${G}${DAY_TX}"
+    print_line "TRAFFIC" "${TRAFFIC}" "${G}${TRAFFIC}"
+    echo -e "${C}└───────────────────────────────────────────────┘${NC}"
+    echo -e "${C}┌───────────────────────────────────────────────┐${NC}"
+    echo -e "${C}│${NC}${G} XRAY : ${sx_disp}${C}│${NC}${G} SSH-WS : ${sw_disp}${C}│${NC}${G} LOADBLC : ${sb_disp}${C}│${NC} ${sa_disp} ${C}│${NC}"
+    echo -e "${C}└───────────────────────────────────────────────┘${NC}"
+    echo -e "${C}┌───────────────────────────────────────────────┐${NC}"
+    print_line "Version" "LBJv1.0" "${O}LBJv1.0" 12
+    print_line "Order By" "Admin" "${O}Admin" 12
+    print_line "Client Name" "${CLIENT_NAME:0:31}" "${O}${CLIENT_NAME:0:31}" 12
+    print_line "Expiry In" "${sisa_hari} Days" "${O}${sisa_hari} Days" 12
+    echo -e "${C}└───────────────────────────────────────────────┘${NC}"
+    echo -e "${B}-------------------------------------------------${NC}"
+    echo -e "   ${C}1.)${NC} ${C}☞${NC} ${G}SSH               ${C}6.)${NC} ${C}☞${NC} ${G}FEATURES${NC}"
+    echo -e "${C}│${NC}  ${C}2.)${NC} ${C}☞${NC} ${G}VMESS             ${C}7.)${NC} ${C}☞${NC} ${G}SET REDUCE/TIME  ${C}│${NC}"
+    echo -e "   ${C}3.)${NC} ${C}☞${NC} ${G}VLESS             ${C}8.)${NC} ${C}☞${NC} ${G}SET BRAND NAME${NC}"
+    echo -e "${C}│${NC}  ${C}4.)${NC} ${C}☞${NC} ${G}TROJAN            ${C}9.)${NC} ${C}☞${NC} ${G}CHECK SERVICES   ${C}│${NC}"
+    echo -e "   ${C}5.)${NC} ${C}☞${NC} ${G}SETUP BOT         ${C}x.)${NC} ${C}☞${NC} ${G}EXIT${NC}"
+    echo -e "${B}-------------------------------------------------${NC}"
+    echo ""
+    echo -ne "${G}Select From Options [1-9 or x] : ${NC}"; read opt
 
-# TAMPILAN MENU
-clear
-echo -e "${C}┌───────────────────────────────────────────────┐${NC}"
-echo -e "${C}│${BG_RED}${G}                 LBJ TUNNELING                 ${NC}${C}│${NC}"
-echo -e "${C}└───────────────────────────────────────────────┘${NC}"
-echo -e "${C}┌───────────────────────────────────────────────┐${NC}"
-print_line "OS" "${OS:0:36}" "${G}${OS:0:36}"
-print_line "RAM" "${RAM:0:36}" "${G}${RAM:0:36}"
-print_line "SWAP" "${SWAP:0:36}" "${G}${SWAP:0:36}"
-print_line "CITY" "${CITY:0:36}" "${G}${CITY:0:36}"
-print_line "ISP" "${ISP:0:36}" "${G}${ISP:0:36}"
-print_line "IP" "${IP:0:36}" "${PINK}${IP:0:36}"
-print_line "DOMAIN" "${DOMAIN:0:36}" "${G}${DOMAIN:0:36}"
-print_line "UPTIME" "${UPTIME:0:36}" "${G}${UPTIME:0:36}"
-echo -e "${C}│${P}-----------------------------------------------${NC}${C}│${NC}"
-print_line "MONTH" "${MON_TOT}  [${MONTH}]" "${G}${MON_TOT}  ${C}[${MONTH}]"
-print_line "RX" "${MON_RX}" "${G}${MON_RX}"
-print_line "TX" "${MON_TX}" "${G}${MON_TX}"
-echo -e "${C}│${P}-----------------------------------------------${NC}${C}│${NC}"
-print_line "DAY" "${DAY_TOT}  [${DAY}]" "${G}${DAY_TOT}  ${C}[${DAY}]"
-print_line "RX" "${DAY_RX}" "${G}${DAY_RX}"
-print_line "TX" "${DAY_TX}" "${G}${DAY_TX}"
-print_line "TRAFFIC" "${TRAFFIC}" "${G}${TRAFFIC}"
-echo -e "${C}└───────────────────────────────────────────────┘${NC}"
-echo -e "${C}┌───────────────────────────────────────────────┐${NC}"
-echo -e "${C}│${NC}${G} XRAY : ${sx_disp}${C}│${NC}${G} SSH-WS : ${sw_disp}${C}│${NC}${G} LOADBLC : ${sb_disp}${C}│${NC} ${sa_disp} ${C}│${NC}"
-echo -e "${C}└───────────────────────────────────────────────┘${NC}"
-echo -e "${C}┌───────────────────────────────────────────────┐${NC}"
-print_line "Version" "LBJv1.0" "${O}LBJv1.0" 12
-print_line "Order By" "Admin" "${O}Admin" 12
-print_line "Client Name" "${CLIENT_NAME:0:31}" "${O}${CLIENT_NAME:0:31}" 12
-print_line "Expiry In" "${sisa_hari} Days" "${O}${sisa_hari} Days" 12
-echo -e "${C}└───────────────────────────────────────────────┘${NC}"
-echo -e "${B}-------------------------------------------------${NC}"
-echo -e "   ${C}1.)${NC} ${C}☞${NC} ${G}SSH               ${C}6.)${NC} ${C}☞${NC} ${G}FEATURES${NC}"
-echo -e "${C}│${NC}  ${C}2.)${NC} ${C}☞${NC} ${G}VMESS             ${C}7.)${NC} ${C}☞${NC} ${G}SET REDUCE/TIME  ${C}│${NC}"
-echo -e "   ${C}3.)${NC} ${C}☞${NC} ${G}VLESS             ${C}8.)${NC} ${C}☞${NC} ${G}SET BRAND NAME${NC}"
-echo -e "${C}│${NC}  ${C}4.)${NC} ${C}☞${NC} ${G}TROJAN            ${C}9.)${NC} ${C}☞${NC} ${G}CHECK SERVICES   ${C}│${NC}"
-echo -e "   ${C}5.)${NC} ${C}☞${NC} ${G}SETUP BOT         ${C}x.)${NC} ${C}☞${NC} ${G}EXIT${NC}"
-echo -e "${B}-------------------------------------------------${NC}"
-echo ""
-echo -ne "${G}Select From Options [1-9 or x] : ${NC}"; read opt
-
-case $opt in
-    1) m-ssh ;;
-    2) m-vmess ;;
-    3) echo -e "\n ${O}VLESS Utility sedang dipersiapkan...${NC}"; sleep 1 ;;
-    4) echo -e "\n ${O}TROJAN Utility sedang dipersiapkan...${NC}"; sleep 1 ;;
-    5|6|7|8|9) echo -e "\n ${O}Modul utilitas sedang dikembangkan.${NC}"; sleep 1 ;;
-    x|X) clear; exit 0 ;;
-    *) echo -e "\n ${R}Please enter an correct number${NC}"; sleep 1 ;;
-esac
-EOF
-chmod +x /usr/bin/menu
+    case $opt in
+        1) m-ssh ;;
+        2) m-vmess ;;
+        3) echo -e "\n ${O}VLESS Utility sedang dipersiapkan...${NC}"; sleep 1 ;;
+        4) echo -e "\n ${O}TROJAN Utility sedang dipersiapkan...${NC}"; sleep 1 ;;
+        5|6|7|8|9) echo -e "\n ${O}Modul utilitas sedang dikembangkan.${NC}"; sleep 1 ;;
+        x|X) clear; exit 0 ;;
+        *) echo -e "\n ${R}Please enter an correct number${NC}"; sleep 1 ;;
+    esac
+done
