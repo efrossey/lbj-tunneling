@@ -1,7 +1,6 @@
 #!/bin/bash
 
 G="\e[92m"; O="\e[93m"; C="\e[36m"; B="\e[36m"; P="\e[35m"; PINK="\e[95m"; BG_RED="\e[41m"; R="\e[91m"; NC="\e[0m"
-
 XRAY_CONF="/usr/local/etc/xray/config.json"
 DB_FILE="/etc/vpn/database.db"
 
@@ -47,16 +46,20 @@ UPTIME=$(uptime -p | sed 's/up //')
 MONTH=$(date +%B)
 DAY=$(date +%A)
 
+# Filter vnstat realtime agar kotak menu tidak hancur saat VPS fresh
 IFACE=$(ip -o -4 route show to default | awk '{print $5}' | head -n 1)
 if [[ -n "$IFACE" ]]; then
-    VSTAT=$(vnstat -i $IFACE --oneline 2>/dev/null)
-    if [[ -n "$VSTAT" ]]; then
+    VSTAT=$(vnstat -i "$IFACE" --oneline 2>/dev/null)
+    if [[ "$VSTAT" == *";"* ]]; then
         DAY_RX=$(echo "$VSTAT" | cut -d';' -f4 | sed 's/ //g')
         DAY_TX=$(echo "$VSTAT" | cut -d';' -f5 | sed 's/ //g')
         DAY_TOT=$(echo "$VSTAT" | cut -d';' -f6 | sed 's/ //g')
         MON_RX=$(echo "$VSTAT" | cut -d';' -f9 | sed 's/ //g')
         MON_TX=$(echo "$VSTAT" | cut -d';' -f10 | sed 's/ //g')
         MON_TOT=$(echo "$VSTAT" | cut -d';' -f11 | sed 's/ //g')
+    else
+        DAY_RX="0MB"; DAY_TX="0MB"; DAY_TOT="0MB"
+        MON_RX="0MB"; MON_TX="0MB"; MON_TOT="0MB"
     fi
     R1=$(cat /sys/class/net/$IFACE/statistics/rx_bytes 2>/dev/null || echo 0)
     sleep 0.1
@@ -65,8 +68,8 @@ if [[ -n "$IFACE" ]]; then
     KBIT=$(awk "BEGIN {printf \"%.2f\", $BPS/1024}")
     TRAFFIC="${KBIT} kbit/s"
 fi
-DAY_RX=${DAY_RX:-"0MiB"}; DAY_TX=${DAY_TX:-"0MiB"}; DAY_TOT=${DAY_TOT:-"0MiB"}
-MON_RX=${MON_RX:-"0MiB"}; MON_TX=${MON_TX:-"0MiB"}; MON_TOT=${MON_TOT:-"0MiB"}
+DAY_RX=${DAY_RX:-"0MB"}; DAY_TX=${DAY_TX:-"0MB"}; DAY_TOT=${DAY_TOT:-"0MB"}
+MON_RX=${MON_RX:-"0MB"}; MON_TX=${MON_TX:-"0MB"}; MON_TOT=${MON_TOT:-"0MB"}
 TRAFFIC=${TRAFFIC:-"0.00 kbit/s"}
 
 auto_cleanup() {
@@ -152,7 +155,7 @@ while true; do
     print_line "TRAFFIC" "${TRAFFIC}" "${G}${TRAFFIC}"
     echo -e "${C}└───────────────────────────────────────────────┘${NC}"
     echo -e "${C}┌───────────────────────────────────────────────┐${NC}"
-    echo -e "${C}│${NC}${G} XRAY : ${sx_disp}${C}│${NC}${G} SSH-WS : ${sw_disp}${C}│${NC}${G} LOADBLC : ${sb_disp}${C}│${NC} ${sa_disp} ${C}│${NC}"
+    echo -e "${C}│${NC} ${G}XRAY :${NC} ${sx_disp} ${C}│${NC} ${G}SSH-WS :${NC} ${sw_disp} ${C}│${NC} ${G}LOADBLC :${NC} ${sb_disp} ${C}│${NC}"
     echo -e "${C}└───────────────────────────────────────────────┘${NC}"
     echo -e "${C}┌───────────────────────────────────────────────┐${NC}"
     print_line "Version" "LBJv1.0" "${O}LBJv1.0" 12
