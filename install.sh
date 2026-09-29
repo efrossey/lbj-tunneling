@@ -12,11 +12,12 @@ echo -e "${C}===============================================${NC}"
 echo -e "${G}         SETUP DOMAIN LBJ TUNNELING            ${NC}"
 echo -e "${C}===============================================${NC}"
 echo -e ""
-read -p "Masukkan Domain Anda (contoh: vpn.domain.com): " domain_input
+# Tambahan </dev/tty memastikan input tidak terlewat jika diinstal via bash pipe
+read -p "Masukkan Domain Anda (contoh: vpn.domain.com): " domain_input </dev/tty
 
 echo -e "\n${G}Domain berhasil disimpan: ${domain_input}${NC}\n"
 
-# 2. Proses Install Paket Wajib (Sekarang prosesnya akan terlihat di layar)
+# 2. Proses Install Paket Wajib (Proses akan terlihat di layar)
 echo -e "${C}===============================================${NC}"
 echo -e "${G}     INSTALLING DEPENDENCIES (MOHON TUNGGU)    ${NC}"
 echo -e "${C}===============================================${NC}"
@@ -36,12 +37,12 @@ echo -e "${C}===============================================${NC}"
 REPO_URL="https://raw.githubusercontent.com/efrossey/lbj-tunneling/refs/heads/main"
 
 cd /usr/bin
-# Menghilangkan -q agar progres download terlihat
+# Menghilangkan opsi -q agar progres download (100%) terlihat jelas
 wget -O menu "${REPO_URL}/menu" && chmod +x menu
 wget -O m-ssh "${REPO_URL}/m-ssh" && chmod +x m-ssh
 wget -O m-vmess "${REPO_URL}/m-vmess" && chmod +x m-vmess
 
-# 5. Setup Database
+# 5. Setup Database Pertama Kali
 echo -e "\n${G}Menyiapkan Database...${NC}"
 if [ ! -f /etc/vpn/database.db ]; then
     sqlite3 /etc/vpn/database.db "CREATE TABLE IF NOT EXISTS users (username TEXT, protocol TEXT, exp_date TEXT, ip_limit INTEGER DEFAULT 0, password TEXT, quota INTEGER DEFAULT 0, status TEXT DEFAULT 'active');"
