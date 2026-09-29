@@ -1,0 +1,54 @@
+#!/bin/bash
+G="\e[92m"; O="\e[93m"; C="\e[36m"; R="\e[91m"; NC="\e[0m"
+DB_FILE="/etc/vpn/database.db"
+DOMAIN=$(cat /etc/vpn/domain.txt 2>/dev/null)
+CITY=$(curl -s4 http://ip-api.com/line?fields=city || curl -s4 https://ipinfo.io/city || echo "Unknown")
+ISP=$(curl -s4 http://ip-api.com/line?fields=isp || curl -s4 https://ipinfo.io/org | cut -d " " -f 2- || echo "Unknown")
+
+create_trojan() {
+    clear
+    echo -ne "${G}Username         : ${NC}"; read user
+    echo -ne "${G}Quota Limit (GB) : ${NC}"; read quota
+    echo -ne "${G}Limit (IP)       : ${NC}"; read iplimit
+    echo -ne "${G}Expired (days)   : ${NC}"; read days
+
+    uuid=$(cat /proc/sys/kernel/random/uuid)
+    exp=$(date -d "+$days days" +"%Y-%m-%d")
+    sqlite3 "$DB_FILE" "INSERT INTO users (username, protocol, exp_date, ip_limit, password, quota) VALUES ('$user', 'trojan', '$exp', '$iplimit', '$uuid', '$quota');"
+
+    trojan_ws="trojan://${uuid}@${DOMAIN}:443?path=/trojan&security=tls&host=${DOMAIN}&type=ws&sni=${DOMAIN}#${user}"
+    trojan_grpc="trojan://${uuid}@${DOMAIN}:443?mode=gun&security=tls&type=grpc&serviceName=trojan&sni=${DOMAIN}#${user}"
+    trojan_up="trojan://${uuid}@${DOMAIN}:443?path=/uptrojan&security=tls&host=${DOMAIN}&type=httpupgrade&sni=${DOMAIN}#${user}"
+
+    clear
+    echo -e " ————————————————————————————————————————"
+    echo -e "             LBJ Tunneling             "
+    echo -e " ————————————————————————————————————————\n"
+    echo -e "                  TROJAN                 "
+    echo -e " ————————————————————————————————————————\n"
+    echo -e " TROJAN\n"
+    echo -e " Remarks      : ${user}"
+    echo -e " CITY         : ${CITY}"
+    echo -e " ISP          : ${ISP}"
+    echo -e " Domain       : ${DOMAIN}"
+    echo -e " Port         : 443,8443"
+    echo -e " Port any     : 2052,2053,8880"
+    echo -e " Key          : ${uuid}"
+    echo -e " Network      : ws,grpc,upgrade"
+    echo -e " Path ws      : /trojan"
+    echo -e " serviceName  : trojan"
+    echo -e " Path upgrade : /uptrojan\n"
+    echo -e " ————————————————————————————————————————"
+    echo -e " Link WS     : ${trojan_ws}"
+    echo -e " ————————————————————————————————————————"
+    echo -e " Link GRPC   : ${trojan_grpc}"
+    echo -e " ————————————————————————————————————————"
+    echo -e " Link Upgrade: ${trojan_up}"
+    echo -e " ————————————————————————————————————————"
+    echo -e "         Expired  :  ${exp}"
+    echo -e " ————————————————————————————————————————\n"
+    read -p "Press Enter to return..." dummy
+}
+
+# (Bisa tambahkan loop menu disini seperti m-vmess)
+create_trojan
